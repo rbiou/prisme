@@ -1,25 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
 
 export interface ParsedHash {
-  name: 'home' | 'rules' | 'settings' | 'invite' | 'placement' | 'connect' | 'game';
-  code?: string;
+  name: 'home' | 'rules' | 'settings' | 'lobby' | 'placement' | 'game';
 }
 
 export function parseHash(hash: string): ParsedHash {
   const value = hash.replace(/^#\/?/, '');
   if (!value) return { name: 'home' };
-  const [head, ...rest] = value.split('/');
+  const [head] = value.split('/');
   switch (head) {
     case 'regles':
       return { name: 'rules' };
     case 'reglages':
       return { name: 'settings' };
-    case 'invite':
-      return { name: 'invite', code: rest.join('/') };
+    case 'salon':
+      return { name: 'lobby' };
     case 'placer':
       return { name: 'placement' };
-    case 'connexion':
-      return { name: 'connect' };
     case 'partie':
       return { name: 'game' };
     default:

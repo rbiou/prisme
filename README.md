@@ -3,7 +3,9 @@
 Jeu de déduction à deux joueurs, en français, jouable sur mobile. Chaque joueur
 cache une mine de cinq gemmes, puis tente de reconstituer celle de l'adversaire
 en tirant des rayons et en interrogeant des cases. Application 100 % frontend,
-pair-à-pair, sans serveur.
+pair-à-pair, sans backend propre : un courtier public PeerJS sert uniquement de
+rendez-vous pour le code à six chiffres, puis les données passent en WebRTC
+direct entre les deux navigateurs.
 
 **Jouer :** [https://rbiou.github.io/prisme/](https://rbiou.github.io/prisme/)
 
@@ -15,7 +17,8 @@ npm run dev
 ```
 
 Ouvrir l'URL affichée. Pour tester une partie à deux, ouvrir deux navigateurs
-(ou deux appareils) et utiliser le lien d'invitation.
+(ou deux appareils) : l'hôte crée un salon et partage le code à six chiffres,
+l'invité saisit ce code sur l'accueil.
 
 ## Scripts
 
@@ -43,8 +46,9 @@ Ouvrir l'URL affichée. Pour tester une partie à deux, ouvrir deux navigateurs
 - Vite + React + TypeScript.
 - Moteur pur dans `src/engine/`, testé avec Vitest.
 - WebRTC via un canal de données fiable ; STUN public uniquement, pas de TURN.
-- Signalisation manuelle : lien d'invitation + code de réponse, avec Web Share
-  API et presse-papiers.
+- Rendez-vous par code à six chiffres : PeerJS et son courtier public
+  `0.peerjs.com` réservent l'identifiant du salon. Dès que le canal est ouvert,
+  les échanges de jeu passent directement entre les navigateurs.
 - La mine secrète reste locale. Seuls le point de sortie et la couleur d'un
   rayon sont échangés.
 - PWA installable, mises à jour proposées et jamais imposées pendant une partie.
@@ -54,9 +58,13 @@ Ouvrir l'URL affichée. Pour tester une partie à deux, ouvrir deux navigateurs
 
 - Certains réseaux mobiles ou NAT symétriques ne permettent pas la connexion
   sans TURN. Un message clair invite à réessayer sur un autre réseau.
+- Le courtier public PeerJS doit être joignable au moment du rendez-vous. Il ne
+  voit pas les données de jeu, qui restent en WebRTC direct.
 - Une connexion WebRTC ne survit pas au rechargement de la page.
 - Le pair-à-pair repose sur la confiance ; un engagement SHA-256 et une
   vérification a posteriori permettent de détecter certaines incohérences.
+- Le code à six chiffres n'est pas un secret fort : un tiers peut théoriquement
+  deviner un salon. L'hôte voit le nom du joueur avant de lancer la partie.
 - Le MVP couvre uniquement la boîte de base à deux joueurs.
 
 ## Déploiement

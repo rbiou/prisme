@@ -1,49 +1,41 @@
-import { useMemo, useState } from 'react';
-import { fr } from '../i18n/fr';
-import { extractSignalCode } from '../net/signaling';
+import { useState } from 'react';
 import { PrismMark } from '../components/AppHeader';
-import type { PlayerId } from '../engine/types';
+import { fr } from '../i18n/fr';
+import { formatRoomCode, normalizeRoomCode } from '../net/roomCode';
 
 export interface HomeScreenProps {
   initialName: string;
-  inviteCode?: string | null;
   resumeLabel?: string | null;
-  role?: PlayerId | null;
   onResume: () => void;
   onCreate: (name: string) => void;
   onJoin: (name: string, code: string) => void;
-  onNavigate: (path: string) => void;
 }
 
 export function HomeScreen({
   initialName,
-  inviteCode = null,
   resumeLabel = null,
-  role = null,
   onResume,
   onCreate,
   onJoin,
-  onNavigate,
 }: HomeScreenProps) {
   const [name, setName] = useState(initialName);
-  const [joinValue, setJoinValue] = useState('');
+  const [code, setCode] = useState('');
   const [joinError, setJoinError] = useState<string | null>(null);
-  const invitation = useMemo(
-    () => (inviteCode ? extractSignalCode(`#/invite/${inviteCode}`) : null),
-    [inviteCode],
-  );
   const cleanName = name.trim() || 'Joueur';
 
+  function changeCode(value: string) {
+    setCode(value.replace(/\D/g, '').slice(0, 6));
+    setJoinError(null);
+  }
+
   function join() {
-    const code = invitation ?? extractSignalCode(joinValue);
-    if (!code) {
-      setJoinError(
-        'Ce lien ou ce code ne semble pas valide. Demandez à votre adversaire de partager de nouveau son invitation.',
-      );
+    const normalized = normalizeRoomCode(code);
+    if (!normalized) {
+      setJoinError('Entrez le code à six chiffres affiché chez votre adversaire.');
       return;
     }
     setJoinError(null);
-    onJoin(cleanName, code);
+    onJoin(cleanName, normalized);
   }
 
   return (
@@ -53,11 +45,6 @@ export function HomeScreen({
           <p className="kicker">{fr.home.kicker}</p>
           <h1>{fr.home.title}</h1>
           <p className="lead">{fr.home.intro}</p>
-          <div className="hero-badges" aria-label="Points clés">
-            <span>2 joueurs</span>
-            <span>Sans serveur</span>
-            <span>10 × 8</span>
-          </div>
         </div>
         <div className="hero-art" aria-hidden="true">
           <div className="hero-prism">
@@ -71,27 +58,11 @@ export function HomeScreen({
         </div>
       </section>
 
-      {invitation ? (
-        <section className="invite-banner" role="status">
-          <div>
-            <strong>Invitation reçue</strong>
-            <p>
-              Un adversaire vous invite à rejoindre sa mine. Choisissez votre nom, puis composez
-              votre propre mine.
-            </p>
-          </div>
-          <span className="badge badge--prism">Lien privé</span>
-        </section>
-      ) : null}
-
       {resumeLabel ? (
         <section className="resume-card">
           <div>
             <p className="kicker">Partie en cours</p>
             <h2>{resumeLabel}</h2>
-            {role ? (
-              <p className="muted">Vous jouez en tant que {role === 'host' ? 'hôte' : 'invité'}.</p>
-            ) : null}
           </div>
           <button type="button" className="btn btn--primary" onClick={onResume}>
             Reprendre
@@ -111,7 +82,6 @@ export function HomeScreen({
             maxLength={40}
           />
         </label>
-        <p className="hint">Ce nom reste sur cet appareil et n’est jamais publié.</p>
       </div>
 
       <div className="home-grid">
@@ -120,10 +90,7 @@ export function HomeScreen({
             ◈
           </div>
           <h2>Créer une partie</h2>
-          <p>
-            Composez votre mine secrète, puis partagez un lien. Aucun compte, aucun serveur : la
-            connexion se fait directement entre les navigateurs.
-          </p>
+          <p>Ouvrez un salon et partagez le code à six chiffres avec votre adversaire.</p>
           <button
             type="button"
             className="btn btn--primary btn--wide"
@@ -131,63 +98,39 @@ export function HomeScreen({
           >
             {fr.home.create}
           </button>
-          <p className="fine-print">
-            Vous commencerez par placer vos cinq gemmes. Rien ne sera envoyé avant la fin de la
-            partie.
-          </p>
         </article>
 
         <article className="card card--join">
           <div className="card-icon card-icon--alt" aria-hidden="true">
             ⬡
           </div>
-          <h2>{fr.home.join}</h2>
-          <p>
-            Collez le lien reçu, ou seulement son code. Vous placerez votre mine avant de renvoyer
-            votre réponse.
-          </p>
-          {invitation ? (
-            <div className="invite-code-preview">
-              <span className="mono">{`#/invite/${invitation}`}</span>
-            </div>
-          ) : (
-            <label className="field">
-              <span>{fr.home.joinTitle}</span>
-              <textarea
-                value={joinValue}
-                onChange={(event) => setJoinValue(event.target.value)}
-                placeholder={fr.home.joinPlaceholder}
-                rows={3}
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </label>
-          )}
+          <h2>Rejoindre une partie</h2>
+          <label className="field">
+            <span>{fr.home.joinTitle}</span>
+            <input
+              className="code-input"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={formatRoomCode(code)}
+              onChange={(event) => changeCode(event.target.value)}
+              placeholder={fr.home.joinPlaceholder}
+              autoComplete="one-time-code"
+              spellCheck={false}
+              maxLength={7}
+              aria-describedby={joinError ? 'join-code-error' : undefined}
+            />
+          </label>
           {joinError ? (
-            <p className="inline-alert" role="alert">
+            <p className="inline-alert" role="alert" id="join-code-error">
               {joinError}
             </p>
           ) : null}
           <button type="button" className="btn btn--secondary btn--wide" onClick={join}>
-            {invitation ? 'Rejoindre cette partie' : fr.home.joinAction}
+            {fr.home.joinAction}
           </button>
         </article>
       </div>
-
-      <section className="privacy-note">
-        <PrismMark className="prism-mark prism-mark--small" />
-        <div>
-          <strong>Votre mine reste privée.</strong>
-          <p>{fr.home.privacy}</p>
-        </div>
-      </section>
-
-      <p className="home-footnote">
-        {fr.home.noServer}{' '}
-        <button type="button" className="text-link" onClick={() => onNavigate('regles')}>
-          Lire les règles
-        </button>
-      </p>
     </div>
   );
 }

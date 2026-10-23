@@ -8,8 +8,8 @@ import { validateMine } from '../engine/placement';
 import type { Cell, Mine, PlayerId, SerializedMine } from '../engine/types';
 import { createCommitment, randomHex } from '../net/integrity';
 import { newMessageId, PROTOCOL_VERSION, type NetworkMessage } from '../net/protocol';
+import { normalizeRoomCode } from '../net/roomCode';
 import { MatchSession, type ReadyContext } from '../net/session';
-import { extractSignalCode } from '../net/signaling';
 import type { Settings } from './settings';
 import { initialMatchState, matchReducer, type MatchState } from './matchReducer';
 
@@ -20,10 +20,11 @@ export interface ActionResult {
 
 export interface UseMatchResult {
   state: MatchState;
-  configure: (role: PlayerId, playerName: string, inviteCode?: string | null) => void;
+  hostGame: (playerName: string) => Promise<ActionResult>;
+  joinGame: (playerName: string, code: string) => Promise<ActionResult>;
+  startPlacement: () => boolean;
   resetMatch: (keepName?: boolean) => void;
   lockMine: (mine: Mine) => Promise<ActionResult>;
-  connectAnswer: (code: string) => Promise<ActionResult>;
   sendWave: (label: string) => boolean;
   sendCell: (cell: Cell) => boolean;
   answerIncoming: () => boolean;
@@ -73,16 +74,6 @@ export function useMatch(settings: Settings): UseMatchResult {
     }
   }, []);
 
-  const configure = useCallback(
-    (role: PlayerId, playerName: string, inviteCode: string | null = null) => {
-      closeSession();
-      revealSentRef.current = false;
-      clearDraft();
-      dispatch({ type: 'begin', role, playerName, inviteCode });
-    },
-    [closeSession],
-  );
-
   const resetMatch = useCallback(
     (keepName = true) => {
       closeSession();
@@ -93,58 +84,119 @@ export function useMatch(settings: Settings): UseMatchResult {
     [closeSession],
   );
 
-  const createSession = useCallback(
-    (role: PlayerId, name: string, mineHash: string): MatchSession => {
-      let session: MatchSession | null = null;
-      session = new MatchSession(
-        role,
-        { name, nonce: randomHex(16), mineHash },
-        {
-          onPhase: (phase, detail) => {
-            dispatch({ type: 'phase', phase, detail: detail ?? null });
-          },
-          onTransportStatus: (status, detail) => {
-            dispatch({ type: 'transport', status, detail: detail ?? null });
-          },
-          onMessage: (message) => {
-            lastSeenRef.current = Date.now();
-            if (message.type === 'ping') {
-              session?.send({
-                protocol: PROTOCOL_VERSION,
-                type: 'pong',
-                id: newMessageId(),
-                from: role,
-                replyTo: message.id,
-              });
-            }
-            dispatch({ type: 'message', message, now: Date.now() });
-          },
-          onReady: (context: ReadyContext) => {
-            revealSentRef.current = false;
-            lastSeenRef.current = Date.now();
-            dispatch({ type: 'ready', context, now: Date.now() });
-          },
-          onWarning: (message) => dispatch({ type: 'warning', message }),
-          onError: (message) => dispatch({ type: 'error', message }),
+  const createSession = useCallback((role: PlayerId, name: string): MatchSession => {
+    let session: MatchSession | null = null;
+    session = new MatchSession(
+      role,
+      { name, nonce: randomHex(16) },
+      {
+        onPhase: (phase, detail) => {
+          dispatch({ type: 'phase', phase, detail: detail ?? null });
         },
-      );
-      return session;
+        onTransportStatus: (status, detail) => {
+          dispatch({ type: 'transport', status, detail: detail ?? null });
+        },
+        onLobby: (context) => {
+          lastSeenRef.current = Date.now();
+          dispatch({ type: 'lobby', context });
+        },
+        onMessage: (message) => {
+          lastSeenRef.current = Date.now();
+          if (message.type === 'ping') {
+            session?.send({
+              protocol: PROTOCOL_VERSION,
+              type: 'pong',
+              id: newMessageId(),
+              from: role,
+              replyTo: message.id,
+            });
+          }
+          dispatch({ type: 'message', message, now: Date.now() });
+        },
+        onReady: (context: ReadyContext) => {
+          revealSentRef.current = false;
+          lastSeenRef.current = Date.now();
+          dispatch({ type: 'ready', context, now: Date.now() });
+        },
+        onWarning: (message) => dispatch({ type: 'warning', message }),
+        onError: (message) => dispatch({ type: 'error', message }),
+      },
+    );
+    return session;
+  }, []);
+
+  const hostGame = useCallback(
+    async (playerName: string): Promise<ActionResult> => {
+      closeSession();
+      revealSentRef.current = false;
+      clearDraft();
+      const name = playerName.trim() || 'Joueur';
+      dispatch({ type: 'begin', role: 'host', playerName: name });
+      const session = createSession('host', name);
+      sessionRef.current = session;
+      try {
+        const code = await session.host();
+        dispatch({ type: 'room-code', code });
+        return { ok: true };
+      } catch (error) {
+        const message = messageFor(error);
+        dispatch({ type: 'error', message });
+        return { ok: false, error: message };
+      }
     },
-    [],
+    [closeSession, createSession],
   );
+
+  const joinGame = useCallback(
+    async (playerName: string, code: string): Promise<ActionResult> => {
+      const normalized = normalizeRoomCode(code);
+      if (!normalized) {
+        const message = 'Entrez un code de partie à six chiffres.';
+        dispatch({ type: 'error', message });
+        return { ok: false, error: message };
+      }
+      closeSession();
+      revealSentRef.current = false;
+      clearDraft();
+      const name = playerName.trim() || 'Joueur';
+      dispatch({ type: 'begin', role: 'guest', playerName: name });
+      dispatch({ type: 'room-code', code: normalized });
+      const session = createSession('guest', name);
+      sessionRef.current = session;
+      try {
+        await session.join(normalized);
+        return { ok: true };
+      } catch (error) {
+        const message = messageFor(error);
+        dispatch({ type: 'error', message });
+        return { ok: false, error: message };
+      }
+    },
+    [closeSession, createSession],
+  );
+
+  const startPlacement = useCallback(() => {
+    const session = sessionRef.current;
+    if (!session) return false;
+    return session.beginPlacement();
+  }, []);
+
+  useEffect(() => () => closeSession(), [closeSession]);
 
   const lockMine = useCallback(
     async (mine: Mine): Promise<ActionResult> => {
-      const role = state.role;
-      if (!role) {
+      const current = stateRef.current;
+      const role = current.role;
+      const session = sessionRef.current;
+      if (!role || !session) {
         return { ok: false, error: 'Choisissez d’abord de créer ou de rejoindre une partie.' };
       }
-      if (state.locked) return { ok: true };
+      if (current.locked) return { ok: true };
       if (lockingRef.current) {
         return { ok: false, error: 'Le verrouillage est déjà en cours.' };
       }
-      if (role === 'guest' && !state.inviteCode) {
-        return { ok: false, error: 'L’invitation est absente. Ouvrez de nouveau le lien reçu.' };
+      if (current.sessionPhase !== 'placing' && current.sessionPhase !== 'awaiting-opponent') {
+        return { ok: false, error: 'La partie n’a pas encore été lancée par l’hôte.' };
       }
       const validation = validateMine(mine, {
         enforceWhiteSymmetry: settings.enforceWhiteSymmetry,
@@ -158,73 +210,27 @@ export function useMatch(settings: Settings): UseMatchResult {
 
       lockingRef.current = true;
       dispatch({ type: 'clear-error' });
-      let session: MatchSession | null = null;
       try {
         const commitment = await createCommitment(mine);
-        session = createSession(role, state.playerName.trim() || 'Joueur', commitment.hash);
-        sessionRef.current = session;
+        if (!session.commitMine(commitment.hash)) {
+          throw new Error('L’engagement de mine n’a pas pu être envoyé. Vérifiez la connexion.');
+        }
         dispatch({
           type: 'mine-locked',
           locked: { mine, salt: commitment.salt, hash: commitment.hash },
         });
-
-        if (role === 'host') {
-          const offerCode = await session.createInvitation();
-          dispatch({ type: 'offer-code', code: offerCode });
-        } else {
-          const answerCode = await session.acceptInvitation(state.inviteCode!);
-          dispatch({ type: 'answer-code', code: answerCode });
-        }
         clearDraft();
         return { ok: true };
       } catch (error) {
         const message = messageFor(error);
-        if (session) {
-          try {
-            session.close();
-          } catch {
-            // Déjà fermée.
-          }
-        }
-        if (sessionRef.current === session) sessionRef.current = null;
         dispatch({ type: 'error', message });
         return { ok: false, error: message };
       } finally {
         lockingRef.current = false;
       }
     },
-    [
-      createSession,
-      settings.enforceWhiteSymmetry,
-      state.inviteCode,
-      state.locked,
-      state.playerName,
-      state.role,
-    ],
+    [settings.enforceWhiteSymmetry],
   );
-
-  const connectAnswer = useCallback(async (code: string): Promise<ActionResult> => {
-    const session = sessionRef.current;
-    if (!session) {
-      return {
-        ok: false,
-        error: 'La session n’est pas prête. Revenez au placement et verrouillez votre mine.',
-      };
-    }
-    const extracted = extractSignalCode(code) ?? code.trim();
-    if (!extracted) {
-      return { ok: false, error: 'Collez le code de réponse reçu.' };
-    }
-    dispatch({ type: 'clear-error' });
-    try {
-      await session.acceptAnswer(extracted);
-      return { ok: true };
-    } catch (error) {
-      const message = messageFor(error);
-      dispatch({ type: 'error', message });
-      return { ok: false, error: message };
-    }
-  }, []);
 
   const sendScan = useCallback(
     (
@@ -612,10 +618,11 @@ export function useMatch(settings: Settings): UseMatchResult {
 
   return {
     state,
-    configure,
+    hostGame,
+    joinGame,
+    startPlacement,
     resetMatch,
     lockMine,
-    connectAnswer,
     sendWave,
     sendCell,
     answerIncoming,

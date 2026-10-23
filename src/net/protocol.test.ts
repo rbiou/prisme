@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { SerializedMine } from '../engine/types';
 import {
   chooseStarter,
+  createCommit,
   createHello,
+  createLobbyStart,
   createStart,
   isNetworkMessage,
   newMessageId,
@@ -13,7 +15,8 @@ import {
 
 const NONCE_A = '0123456789abcdef0123456789abcdef';
 const NONCE_B = 'fedcba9876543210fedcba987654321f';
-const HASH = 'a'.repeat(64);
+const HASH_A = 'a'.repeat(64);
+const HASH_B = 'b'.repeat(64);
 const SALT = 'b'.repeat(32);
 
 const CANDIDATE: SerializedMine = {
@@ -32,38 +35,53 @@ function parse(value: unknown): NetworkMessage | null {
 }
 
 describe('protocole réseau', () => {
-  it('accepte les messages de la poignée de main', () => {
-    expect(parse(createHello('host', 'René', NONCE_A, HASH))).toEqual({
+  it('accepte les messages de présentation et de salon', () => {
+    expect(parse(createHello('host', 'René', NONCE_A))).toEqual({
       protocol: PROTOCOL_VERSION,
       type: 'hello',
       from: 'host',
       name: 'René',
       nonce: NONCE_A,
-      mineHash: HASH,
     });
-    expect(parse(createStart(NONCE_A, NONCE_B))).toMatchObject({
+    expect(parse(createCommit('guest', HASH_B, 'commit-1'))).toEqual({
+      protocol: PROTOCOL_VERSION,
+      type: 'commit',
+      id: 'commit-1',
+      from: 'guest',
+      mineHash: HASH_B,
+    });
+    expect(parse(createLobbyStart('start-1'))).toEqual({
+      protocol: PROTOCOL_VERSION,
+      type: 'lobby-start',
+      id: 'start-1',
+      from: 'host',
+    });
+    expect(parse(createStart(NONCE_A, NONCE_B, HASH_A, HASH_B))).toMatchObject({
       type: 'start',
       from: 'host',
       starter: 'host',
       hostNonce: NONCE_A,
       guestNonce: NONCE_B,
+      hostHash: HASH_A,
+      guestHash: HASH_B,
     });
   });
 
-  it('refuse une poignée de main mal formée', () => {
-    expect(parse({ ...createHello('host', 'X', NONCE_A, HASH), nonce: 'abc' })).toBeNull();
-    expect(parse({ ...createHello('host', 'X', NONCE_A, HASH), mineHash: 'zz' })).toBeNull();
-    expect(parse({ ...createHello('host', 'X', NONCE_A, HASH), name: 'x'.repeat(41) })).toBeNull();
-    expect(
-      parse({
-        protocol: PROTOCOL_VERSION,
-        type: 'start',
-        from: 'guest',
-        starter: 'host',
-        hostNonce: NONCE_A,
-        guestNonce: NONCE_B,
-      }),
-    ).toBeNull();
+  it('refuse une présentation ou un engagement mal formé', () => {
+    expect(parse({ ...createHello('host', 'X', NONCE_A), nonce: 'abc' })).toBeNull();
+    expect(parse({ ...createHello('host', 'X', NONCE_A), from: 'autre' })).toBeNull();
+    expect(parse({ ...createHello('host', 'X', NONCE_A), name: 'x'.repeat(41) })).toBeNull();
+    expect(parse({ ...createCommit('host', HASH_A), mineHash: 'zz' })).toBeNull();
+    expect(parse({ ...createCommit('host', HASH_A), id: '' })).toBeNull();
+    expect(parse({ ...createLobbyStart(), from: 'guest' })).toBeNull();
+  });
+
+  it('refuse un démarrage incohérent', () => {
+    const start = createStart(NONCE_A, NONCE_B, HASH_A, HASH_B)!;
+    expect(parse({ ...start, from: 'guest' })).toBeNull();
+    expect(parse({ ...start, starter: 'autre' })).toBeNull();
+    expect(parse({ ...start, hostHash: 'court' })).toBeNull();
+    expect(parse({ ...start, guestHash: undefined })).toBeNull();
   });
 
   it('accepte les scans de rayon et de case', () => {
@@ -203,7 +221,7 @@ describe('protocole réseau', () => {
   it('ignore les messages inconnus, mal formés ou d’une autre version', () => {
     expect(parseNetworkMessage('{')).toBeNull();
     expect(parseNetworkMessage('null')).toBeNull();
-    expect(parse({ protocol: 2, type: 'ping', id: 'p', from: 'host' })).toBeNull();
+    expect(parse({ protocol: 1, type: 'ping', id: 'p', from: 'host' })).toBeNull();
     expect(parse({ protocol: PROTOCOL_VERSION, type: 'inconnu' })).toBeNull();
     expect(isNetworkMessage({ protocol: PROTOCOL_VERSION, type: 'scan' })).toBe(false);
   });
@@ -215,7 +233,8 @@ describe('protocole réseau', () => {
     const odd = '0'.repeat(31) + '1';
     expect(chooseStarter(odd, '0'.repeat(32))).toBe('guest');
     expect(chooseStarter('x', NONCE_B)).toBeNull();
-    expect(createStart('x', NONCE_B)).toBeNull();
+    expect(createStart('x', NONCE_B, HASH_A, HASH_B)).toBeNull();
+    expect(createStart(NONCE_A, NONCE_B, 'x', HASH_B)).toBeNull();
   });
 
   it('génère des identifiants de message courts et uniques', () => {

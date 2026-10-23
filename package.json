@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Jeu de déduction à deux joueurs, pair-à-pair, sans serveur.",
+  "description": "Jeu de déduction à deux joueurs, pair-à-pair, sans backend propre.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -16,7 +16,7 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "fflate": "^0.8.2",
+    "peerjs": "^1.5.5",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

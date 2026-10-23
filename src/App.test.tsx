@@ -20,12 +20,11 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Sondez la mine adverse.' })).toBeInTheDocument();
   });
 
-  it('route un lien d’invitation vers l’accueil prérempli', () => {
-    window.location.hash = '#/invite/offer-123';
+  it('affiche un garde-fou pour un salon sans partie', () => {
+    window.location.hash = '#/salon';
     render(<App />);
 
-    expect(screen.getByText('Invitation reçue')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Rejoindre cette partie' })).toBeInTheDocument();
+    expect(screen.getByText('Cette partie n’est pas disponible')).toBeInTheDocument();
   });
 
   it('affiche la page des règles via le hash', () => {

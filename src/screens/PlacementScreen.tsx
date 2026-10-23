@@ -24,25 +24,21 @@ function loadDraft(): Mine {
 export interface PlacementScreenProps {
   role: PlayerId;
   playerName: string;
-  inviteCode: string | null;
+  opponentName: string;
   locked: LockedMine | null;
   settings: Settings;
   error: string | null;
   onLock: (mine: Mine) => Promise<ActionResult>;
-  onContinue: () => void;
-  onBack: () => void;
 }
 
 export function PlacementScreen({
   role,
   playerName,
-  inviteCode,
+  opponentName,
   locked,
   settings,
   error,
   onLock,
-  onContinue,
-  onBack,
 }: PlacementScreenProps) {
   const [mine, setMine] = useState<Mine>(() => locked?.mine ?? loadDraft());
   const [busy, setBusy] = useState(false);
@@ -85,47 +81,39 @@ export function PlacementScreen({
     setBusy(false);
     if (!result.ok) {
       setLocalError(result.error ?? 'La mine n’a pas pu être verrouillée.');
-      return;
     }
-    onContinue();
   }
 
   return (
     <div className="screen placement-screen">
       <div className="screen-heading">
         <div>
-          <p className="kicker">{role === 'host' ? 'Étape 1 · Hôte' : 'Étape 1 · Invité'}</p>
+          <p className="kicker">Placement · {role === 'host' ? 'Hôte' : 'Invité'}</p>
           <h1>{fr.placement.title}</h1>
           <p className="lead">{fr.placement.intro}</p>
         </div>
-        <button type="button" className="btn btn--ghost" onClick={onBack}>
-          {fr.common.back}
-        </button>
       </div>
-
-      {role === 'guest' && inviteCode ? (
-        <section className="invite-banner invite-banner--compact" role="status">
-          <div>
-            <strong>{fr.placement.invitationBanner}</strong>
-            <p>Votre code de réponse sera généré après le verrouillage de la mine.</p>
-          </div>
-          <span className="badge badge--prism">Invité</span>
-        </section>
-      ) : null}
 
       {locked ? (
         <section className="locked-banner">
           <div>
             <p className="kicker">Mine verrouillée</p>
-            <h2>Votre mine est prête pour {playerName || 'cette partie'}.</h2>
+            <h2>Votre mine est prête.</h2>
             <p>
-              Elle ne peut plus être modifiée. La connexion peut maintenant être préparée avec
-              l’adversaire.
+              En attente de {opponentName || 'l’adversaire'}… La partie démarrera dès que les deux
+              mines seront verrouillées.
             </p>
+            {error ? (
+              <p className="inline-alert" role="alert">
+                {error}
+              </p>
+            ) : null}
           </div>
-          <button type="button" className="btn btn--primary" onClick={onContinue}>
-            {fr.common.continue}
-          </button>
+          <div className="waiting-orbit" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
         </section>
       ) : null}
 

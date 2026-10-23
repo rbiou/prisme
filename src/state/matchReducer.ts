@@ -13,9 +13,9 @@ import {
 } from '../engine/endgame';
 import type { GameState, PlayerId, ScanRecord, SerializedMine } from '../engine/types';
 import type { NetworkMessage } from '../net/protocol';
-import type { SessionPhase } from '../net/session';
+import { PROTOCOL_VERSION } from '../net/protocol';
+import type { LobbyContext, ReadyContext, SessionPhase } from '../net/session';
 import type { PeerStatus } from '../net/peer';
-import type { ReadyContext } from '../net/session';
 
 export interface LockedMine {
   mine: import('../engine/types').Mine;
@@ -32,17 +32,16 @@ export interface RevealRecord {
 export interface MatchState {
   role: PlayerId | null;
   playerName: string;
-  inviteCode: string | null;
+  roomCode: string | null;
   sessionPhase: SessionPhase;
   sessionDetail: string | null;
   transportStatus: PeerStatus;
   warning: string | null;
   error: string | null;
   locked: LockedMine | null;
-  offerCode: string | null;
-  answerCode: string | null;
   starter: PlayerId | null;
   opponentName: string;
+  opponentNonce: string | null;
   opponentHash: string | null;
   game: GameState | null;
   reveals: Partial<Record<PlayerId, RevealRecord>>;
@@ -52,17 +51,16 @@ export interface MatchState {
 export const initialMatchState: MatchState = {
   role: null,
   playerName: '',
-  inviteCode: null,
+  roomCode: null,
   sessionPhase: 'idle',
   sessionDetail: null,
   transportStatus: 'idle',
   warning: null,
   error: null,
   locked: null,
-  offerCode: null,
-  answerCode: null,
   starter: null,
   opponentName: 'Adversaire',
+  opponentNonce: null,
   opponentHash: null,
   game: null,
   reveals: {},
@@ -70,7 +68,7 @@ export const initialMatchState: MatchState = {
 };
 
 export type MatchAction =
-  | { type: 'begin'; role: PlayerId; playerName: string; inviteCode?: string | null }
+  | { type: 'begin'; role: PlayerId; playerName: string }
   | { type: 'reset'; keepName?: boolean }
   | { type: 'phase'; phase: SessionPhase; detail?: string | null }
   | { type: 'transport'; status: PeerStatus; detail?: string | null }
@@ -79,8 +77,8 @@ export type MatchAction =
   | { type: 'error'; message: string }
   | { type: 'clear-error' }
   | { type: 'mine-locked'; locked: LockedMine }
-  | { type: 'offer-code'; code: string }
-  | { type: 'answer-code'; code: string }
+  | { type: 'room-code'; code: string }
+  | { type: 'lobby'; context: LobbyContext }
   | { type: 'ready'; context: ReadyContext; now: number }
   | { type: 'request-scan'; request: ScanRequest }
   | { type: 'apply-answer'; scanId: string; answer: ScanAnswer; now: number }
@@ -241,6 +239,8 @@ function handleMessage(state: MatchState, message: NetworkMessage, now: number):
     case 'pong':
       return state;
     case 'hello':
+    case 'commit':
+    case 'lobby-start':
     case 'start':
       return state;
     default:
@@ -255,7 +255,6 @@ export function matchReducer(state: MatchState, action: MatchAction): MatchState
         ...initialMatchState,
         role: action.role,
         playerName: action.playerName,
-        inviteCode: action.inviteCode ?? null,
       };
     case 'reset':
       return {
@@ -284,16 +283,23 @@ export function matchReducer(state: MatchState, action: MatchAction): MatchState
       return { ...state, error: null };
     case 'mine-locked':
       return { ...state, locked: action.locked };
-    case 'offer-code':
-      return { ...state, offerCode: action.code };
-    case 'answer-code':
-      return { ...state, answerCode: action.code };
+    case 'room-code':
+      return { ...state, roomCode: action.code };
+    case 'lobby':
+      return {
+        ...state,
+        opponentName: action.context.remoteName || 'Adversaire',
+        opponentNonce: action.context.remoteNonce,
+        warning: null,
+        error: null,
+      };
     case 'ready':
       if (state.game) return state;
       return {
         ...state,
         starter: action.context.starter,
         opponentName: action.context.remoteName || 'Adversaire',
+        opponentNonce: action.context.remoteNonce,
         opponentHash: action.context.remoteMineHash,
         game: createGame(action.context.starter),
         sessionPhase: 'ready',
@@ -328,7 +334,7 @@ export function matchReducer(state: MatchState, action: MatchAction): MatchState
       return handleMessage(
         state,
         {
-          protocol: 1,
+          protocol: PROTOCOL_VERSION,
           type: 'reveal',
           id: `local-reveal-${action.from}`,
           from: action.from,

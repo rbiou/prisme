@@ -5,7 +5,7 @@ import { isSerializedMine } from '../engine/mine';
 import type { Cell, GemColor, PlayerId, RayColor, SerializedMine } from '../engine/types';
 import { isHex, randomHex } from './integrity';
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 export const MAX_NAME_LENGTH = 40;
 export const MAX_ID_LENGTH = 64;
 
@@ -18,7 +18,19 @@ export interface HelloMessage extends MessageBase {
   from: PlayerId;
   name: string;
   nonce: string;
+}
+
+export interface CommitMessage extends MessageBase {
+  type: 'commit';
+  id: string;
+  from: PlayerId;
   mineHash: string;
+}
+
+export interface LobbyStartMessage extends MessageBase {
+  type: 'lobby-start';
+  id: string;
+  from: 'host';
 }
 
 export interface StartMessage extends MessageBase {
@@ -27,6 +39,8 @@ export interface StartMessage extends MessageBase {
   starter: PlayerId;
   hostNonce: string;
   guestNonce: string;
+  hostHash: string;
+  guestHash: string;
 }
 
 export interface ScanWaveMessage extends MessageBase {
@@ -141,6 +155,8 @@ export interface PongMessage extends MessageBase {
 
 export type NetworkMessage =
   | HelloMessage
+  | CommitMessage
+  | LobbyStartMessage
   | StartMessage
   | ScanMessage
   | AnswerMessage
@@ -192,10 +208,17 @@ export function isNetworkMessage(value: unknown): value is NetworkMessage {
         typeof value.name === 'string' &&
         value.name.length <= MAX_NAME_LENGTH &&
         typeof value.nonce === 'string' &&
-        isHex(value.nonce, 32) &&
+        isHex(value.nonce, 32)
+      );
+    case 'commit':
+      return (
+        isMessageId(value.id) &&
+        isPlayerId(value.from) &&
         typeof value.mineHash === 'string' &&
         isHex(value.mineHash, 64)
       );
+    case 'lobby-start':
+      return isMessageId(value.id) && value.from === 'host';
     case 'start':
       return (
         value.from === 'host' &&
@@ -203,7 +226,11 @@ export function isNetworkMessage(value: unknown): value is NetworkMessage {
         typeof value.hostNonce === 'string' &&
         isHex(value.hostNonce, 32) &&
         typeof value.guestNonce === 'string' &&
-        isHex(value.guestNonce, 32)
+        isHex(value.guestNonce, 32) &&
+        typeof value.hostHash === 'string' &&
+        isHex(value.hostHash, 64) &&
+        typeof value.guestHash === 'string' &&
+        isHex(value.guestHash, 64)
       );
     case 'scan':
       if (!isMessageId(value.id) || !isPlayerId(value.from)) return false;
@@ -291,18 +318,26 @@ export function chooseStarter(hostNonce: string, guestNonce: string): PlayerId |
   return mixed % 2n === 0n ? 'host' : 'guest';
 }
 
-export function createHello(
-  from: PlayerId,
-  name: string,
-  nonce: string,
-  mineHash: string,
-): HelloMessage {
-  return { protocol: PROTOCOL_VERSION, type: 'hello', from, name, nonce, mineHash };
+export function createHello(from: PlayerId, name: string, nonce: string): HelloMessage {
+  return { protocol: PROTOCOL_VERSION, type: 'hello', from, name, nonce };
 }
 
-export function createStart(hostNonce: string, guestNonce: string): StartMessage | null {
+export function createCommit(from: PlayerId, mineHash: string, id = newMessageId()): CommitMessage {
+  return { protocol: PROTOCOL_VERSION, type: 'commit', id, from, mineHash };
+}
+
+export function createLobbyStart(id = newMessageId()): LobbyStartMessage {
+  return { protocol: PROTOCOL_VERSION, type: 'lobby-start', id, from: 'host' };
+}
+
+export function createStart(
+  hostNonce: string,
+  guestNonce: string,
+  hostHash: string,
+  guestHash: string,
+): StartMessage | null {
   const starter = chooseStarter(hostNonce, guestNonce);
-  if (!starter) return null;
+  if (!starter || !isHex(hostHash, 64) || !isHex(guestHash, 64)) return null;
   return {
     protocol: PROTOCOL_VERSION,
     type: 'start',
@@ -310,5 +345,7 @@ export function createStart(hostNonce: string, guestNonce: string): StartMessage
     starter,
     hostNonce,
     guestNonce,
+    hostHash,
+    guestHash,
   };
 }

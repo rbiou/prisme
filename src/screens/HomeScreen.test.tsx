@@ -10,7 +10,6 @@ function renderHome(overrides: Partial<Parameters<typeof HomeScreen>[0]> = {}) {
     onResume: vi.fn(),
     onCreate: vi.fn(),
     onJoin: vi.fn(),
-    onNavigate: vi.fn(),
     ...overrides,
   };
   render(<HomeScreen {...props} />);
@@ -31,21 +30,32 @@ describe('HomeScreen', () => {
     expect(props.onCreate).toHaveBeenCalledWith('Camille');
   });
 
-  it('refuse un code d’invitation vide ou invalide', () => {
+  it('refuse un code de partie vide ou incomplet', () => {
     const props = renderHome();
 
     fireEvent.click(screen.getByRole('button', { name: 'Rejoindre' }));
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Ce lien ou ce code ne semble pas valide');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Entrez le code à six chiffres affiché chez votre adversaire.',
+    );
+    expect(props.onJoin).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText('Code à six chiffres'), {
+      target: { value: '12345' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Rejoindre' }));
+
     expect(props.onJoin).not.toHaveBeenCalled();
   });
 
-  it('rejoint directement une invitation reçue par lien', () => {
-    const props = renderHome({ initialName: 'Léa', inviteCode: 'offer-123' });
+  it('rejoint une partie avec un code à six chiffres', () => {
+    const props = renderHome({ initialName: 'Léa' });
 
-    expect(screen.getByText('Invitation reçue')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Rejoindre cette partie' }));
+    fireEvent.change(screen.getByLabelText('Code à six chiffres'), {
+      target: { value: '123 456' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Rejoindre' }));
 
-    expect(props.onJoin).toHaveBeenCalledWith('Léa', 'offer-123');
+    expect(props.onJoin).toHaveBeenCalledWith('Léa', '123456');
   });
 });

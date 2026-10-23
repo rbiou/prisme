@@ -2,10 +2,11 @@
 
 ## Mission
 
-Prisme est un jeu de déduction à deux joueurs, jouable sur mobile, sans serveur :
-chaque joueur cache une mine de cinq gemmes et tente de reconstituer celle de
-l'adversaire en interrogeant des rayons. L'application est une PWA statique,
-déployée sur GitHub Pages. La communication entre les deux navigateurs se fait
+Prisme est un jeu de déduction à deux joueurs, jouable sur mobile, sans backend
+propre : chaque joueur cache une mine de cinq gemmes et tente de reconstituer
+celle de l'adversaire en interrogeant des rayons. L'application est une PWA
+statique, déployée sur GitHub Pages. Un courtier public PeerJS sert uniquement
+de rendez-vous pour un code à six chiffres ; les données de jeu passent ensuite
 en pair-à-pair via WebRTC.
 
 ## Langue et ton
@@ -39,7 +40,7 @@ Toujours lancer `npm run lint`, `npm run typecheck`, `npm run test:run` et
 ```
 src/
   engine/     moteur pur, sans React ni DOM
-  net/        WebRTC, signalisation manuelle, protocole
+  net/        code de salon, rendez-vous PeerJS, WebRTC, protocole
   state/      état React, notes privées, réglages
   components/ composants réutilisables (plateau, gemmes, dialogues)
   screens/    écrans de l'application
@@ -59,9 +60,10 @@ Règles d'architecture :
 4. L'état public de la partie est répliqué à l'identique par les deux clients à
    partir des messages du canal de données. Les notes et la mine locale restent
    privées.
-5. Aucun backend, aucun serveur de signalisation, aucun TURN. STUN public
-   uniquement. La signalisation se fait par lien d'invitation et code de
-   réponse copiés/collés ou partagés.
+5. Aucun backend, aucun TURN. Un courtier public PeerJS assure le rendez-vous :
+   l'hôte réserve un code à six chiffres, l'invité le saisit. STUN public
+   uniquement pour la connexion directe. Le flux est : création → salon →
+   connexion → lancement par l'hôte → placement des mines → partie.
 6. Pas de routing par historique : utiliser le hash (`#/...`) pour fonctionner
    sur GitHub Pages.
 
@@ -117,7 +119,7 @@ Règles d'architecture :
 - Couvrir au minimum : rotations et aires, mélange des 16 combinaisons, rayons
   (sortie, rebond, boucle), validation du placement (chevauchement, contact,
   hors plateau, gemme cachée), scan de case, machine à états de fin de partie,
-  sérialisation et compression de la signalisation.
+  sérialisation, code de salon, protocole et machine de session.
 - Les tests doivent être déterministes ; pas de dépendance à l'ordre des objets
   ou au hasard non contrôlé.
 - Un bug corrigé doit être accompagné d'un test de régression.
@@ -129,8 +131,10 @@ Règles d'architecture :
 - Un engagement SHA-256 (mine + sel) est échangé au début. À la fin, chaque
   joueur révèle sa mine et son sel ; le client vérifie l'engagement et peut
   rejouer les réponses pour détecter une incohérence.
-- Les codes de signalisation contiennent des adresses réseau (candidats ICE).
-  Ne pas les publier au-delà de l'adversaire.
+- Le code à six chiffres n'est pas un secret fort : un tiers peut théoriquement
+  deviner un salon. L'hôte voit le nom du joueur avant de lancer la partie.
+- Le courtier public PeerJS voit l'identifiant du salon et les métadonnées de
+  connexion, jamais la mine ni les réponses.
 - Pas de TURN : certains réseaux mobiles ne pourront pas établir la connexion.
   Afficher un message clair, proposer de réessayer et expliquer que le Wi-Fi ou
   un autre réseau peut aider.

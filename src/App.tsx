@@ -5,9 +5,9 @@ import { useHashRoute } from './hooks/useHashRoute';
 import { usePersistentState } from './hooks/usePersistentState';
 import { usePwaUpdate } from './hooks/usePwaUpdate';
 import { fr } from './i18n/fr';
-import { ConnectScreen } from './screens/ConnectScreen';
 import { GameScreen } from './screens/GameScreen';
 import { HomeScreen } from './screens/HomeScreen';
+import { LobbyScreen } from './screens/LobbyScreen';
 import { PlacementScreen } from './screens/PlacementScreen';
 import { RulesScreen } from './screens/RulesScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
@@ -19,10 +19,7 @@ function GuardScreen({ onHome }: { onHome: () => void }) {
     <div className="screen">
       <section className="status-panel status-panel--warning">
         <h2>Cette partie n’est pas disponible</h2>
-        <p>
-          L’état de la partie n’est pas présent dans cet onglet. Créez une partie ou ouvrez de
-          nouveau le lien d’invitation reçu.
-        </p>
+        <p>Créez une partie ou rejoignez-en une avec un code à six chiffres.</p>
         <button type="button" className="btn btn--primary" onClick={onHome}>
           {fr.common.home}
         </button>
@@ -34,41 +31,58 @@ function GuardScreen({ onHome }: { onHome: () => void }) {
 export default function App() {
   const { settings, updateSettings } = useSettings();
   const match = useMatch(settings);
-  const { state, configure } = match;
+  const { state, hostGame, joinGame: joinRoom, startPlacement } = match;
   const { parsed, navigate } = useHashRoute();
   const [storedName, setStoredName] = usePersistentState('player-name', '');
-  const readyRef = useRef(false);
+  const previousPhaseRef = useRef(state.sessionPhase);
+  const hadGameRef = useRef(false);
 
   const gameActive = Boolean(state.game && state.game.phase !== 'ended');
-  const shouldBlockUpdate = Boolean(state.locked && state.game?.phase !== 'ended');
-  const pwa = usePwaUpdate(shouldBlockUpdate);
+  const matchInProgress = Boolean(
+    state.role && state.sessionPhase !== 'failed' && state.sessionPhase !== 'closed',
+  );
+  const pwa = usePwaUpdate(matchInProgress);
 
+  // Dès que l’hôte lance le placement, les deux joueurs passent à l’écran de
+  // composition de leur mine.
   useEffect(() => {
-    if (state.game && !readyRef.current) {
-      readyRef.current = true;
+    const phase = state.sessionPhase;
+    const wasPlacing =
+      previousPhaseRef.current === 'placing' || previousPhaseRef.current === 'awaiting-opponent';
+    const isPlacing = phase === 'placing' || phase === 'awaiting-opponent';
+    previousPhaseRef.current = phase;
+    if (isPlacing && !wasPlacing && parsed.name !== 'game') {
+      navigate('placer');
+    }
+  }, [navigate, parsed.name, state.sessionPhase]);
+
+  // Quand les deux engagements sont échangés et la mine locale verrouillée,
+  // la partie démarre.
+  useEffect(() => {
+    if (state.game && state.locked && !hadGameRef.current) {
+      hadGameRef.current = true;
       navigate('partie');
     }
-    if (!state.game) readyRef.current = false;
-  }, [navigate, state.game]);
+    if (!state.game) hadGameRef.current = false;
+  }, [navigate, state.game, state.locked]);
 
   useEffect(() => {
-    if (!state.locked || state.game?.phase === 'ended') return;
+    if (!matchInProgress) return;
     const handler = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = '';
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
-  }, [state.game?.phase, state.locked]);
+  }, [matchInProgress]);
 
   useEffect(() => {
     const titles: Record<string, string> = {
       home: 'Prisme — déduction cristalline',
-      invite: 'Invitation — Prisme',
       rules: 'Règles — Prisme',
       settings: 'Réglages — Prisme',
+      lobby: 'Salon — Prisme',
       placement: 'Composez votre mine — Prisme',
-      connect: 'Connexion — Prisme',
       game: 'Partie — Prisme',
     };
     document.title = titles[parsed.name] ?? 'Prisme';
@@ -82,20 +96,31 @@ export default function App() {
 
   function createGame(name: string) {
     setStoredName(name);
-    configure('host', name);
-    navigate('placer');
+    void hostGame(name);
+    navigate('salon');
   }
 
   function joinGame(name: string, code: string) {
     setStoredName(name);
-    configure('guest', name, code);
-    navigate('placer');
+    void joinRoom(name, code);
+    navigate('salon');
   }
 
   function resume() {
-    if (state.game) navigate('partie');
-    else if (state.locked) navigate('connexion');
-    else if (state.role) navigate('placer');
+    if (state.game) {
+      navigate('partie');
+      return;
+    }
+    if (
+      state.role &&
+      (state.sessionPhase === 'placing' ||
+        state.sessionPhase === 'awaiting-opponent' ||
+        state.locked)
+    ) {
+      navigate('placer');
+      return;
+    }
+    if (state.role) navigate('salon');
     else navigate('');
   }
 
@@ -104,24 +129,32 @@ export default function App() {
     navigate('');
   }
 
+  const matchLost = state.sessionPhase === 'failed' || state.sessionPhase === 'closed';
   const resumeLabel = state.game
     ? state.game.phase === 'ended'
       ? 'Voir le résultat de la partie'
       : 'Reprendre la partie en cours'
-    : state.locked
-      ? 'Continuer la connexion'
-      : state.role
+    : !state.role || matchLost
+      ? null
+      : state.sessionPhase === 'placing' || state.sessionPhase === 'awaiting-opponent'
         ? 'Reprendre le placement de votre mine'
-        : null;
+        : state.locked
+          ? 'Reprendre la partie'
+          : 'Revenir au salon';
 
   const headerCurrent =
     parsed.name === 'rules'
       ? 'rules'
       : parsed.name === 'settings'
         ? 'settings'
-        : parsed.name === 'home' || parsed.name === 'invite'
+        : parsed.name === 'home'
           ? 'home'
           : 'other';
+
+  const inPlacement =
+    state.sessionPhase === 'placing' ||
+    state.sessionPhase === 'awaiting-opponent' ||
+    state.sessionPhase === 'ready';
 
   let content: ReactNode;
   switch (parsed.name) {
@@ -131,52 +164,36 @@ export default function App() {
     case 'settings':
       content = <SettingsScreen settings={settings} onChange={updateSettings} onBack={goHome} />;
       break;
-    case 'invite':
-      content = (
-        <HomeScreen
-          initialName={initialName}
-          inviteCode={parsed.code}
-          resumeLabel={resumeLabel}
-          role={state.role}
-          onResume={resume}
-          onCreate={createGame}
-          onJoin={joinGame}
-          onNavigate={navigate}
-        />
-      );
-      break;
-    case 'placement':
-      content = state.role ? (
-        <PlacementScreen
-          role={state.role}
-          playerName={state.playerName}
-          inviteCode={state.inviteCode}
-          locked={state.locked}
-          settings={settings}
-          error={state.error}
-          onLock={match.lockMine}
-          onContinue={() => navigate('connexion')}
-          onBack={goHome}
-        />
-      ) : (
-        <GuardScreen onHome={goHome} />
-      );
-      break;
-    case 'connect':
+    case 'lobby':
       content =
-        state.role && state.locked ? (
-          <ConnectScreen
+        state.role && !state.game ? (
+          <LobbyScreen
             role={state.role}
             playerName={state.playerName}
-            inviteCode={state.inviteCode}
-            offerCode={state.offerCode}
-            answerCode={state.answerCode}
+            roomCode={state.roomCode}
             phase={state.sessionPhase}
+            opponentName={state.opponentName}
             detail={state.sessionDetail}
             error={state.error}
-            onConnect={match.connectAnswer}
+            onStart={startPlacement}
             onLeave={leaveMatch}
-            onRetry={leaveMatch}
+            onHome={leaveMatch}
+          />
+        ) : (
+          <GuardScreen onHome={goHome} />
+        );
+      break;
+    case 'placement':
+      content =
+        state.role && (inPlacement || state.locked) ? (
+          <PlacementScreen
+            role={state.role}
+            playerName={state.playerName}
+            opponentName={state.opponentName}
+            locked={state.locked}
+            settings={settings}
+            error={state.error}
+            onLock={match.lockMine}
           />
         ) : (
           <GuardScreen onHome={goHome} />
@@ -210,11 +227,9 @@ export default function App() {
         <HomeScreen
           initialName={initialName}
           resumeLabel={resumeLabel}
-          role={state.role}
           onResume={resume}
           onCreate={createGame}
           onJoin={joinGame}
-          onNavigate={navigate}
         />
       );
       break;
@@ -239,7 +254,7 @@ export default function App() {
       {!gameActive ? (
         <footer className="app-footer">
           <span>Prisme</span>
-          <span>Deux mines. Cinq gemmes. Aucun serveur.</span>
+          <span>Deux mines. Cinq gemmes. Une seule déduction.</span>
           <button type="button" className="text-link" onClick={() => navigate('reglages')}>
             Réglages
           </button>

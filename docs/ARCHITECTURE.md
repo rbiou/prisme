@@ -7,21 +7,22 @@ Prisme est une application statique composée de trois couches :
 1. **Moteur** (`src/engine/`) : géométrie, pièces, rayons, couleurs, validation,
    scan de case, machine à états de fin de partie. TypeScript pur, sans React ni
    DOM, entièrement testable en Node.
-2. **Réseau** (`src/net/`) : compression de la signalisation, wrapper WebRTC,
-   validation du protocole, session hôte/invité.
+2. **Réseau** (`src/net/`) : code de salon, adaptateur PeerJS, validation du
+   protocole, session hôte/invité et gestion des engagements.
 3. **Interface** (`src/state/`, `src/components/`, `src/screens/`) : React,
    état public de la partie, notes privées, plateau SVG, écrans.
 
-Le serveur n'existe pas. GitHub Pages ne sert que des fichiers statiques. La
-signalisation est manuelle : l'hôte partage une offre compressée dans un lien,
-l'invité renvoie une réponse compressée.
+Aucun backend propre n'existe. GitHub Pages ne sert que des fichiers statiques.
+Le courtier public PeerJS sert uniquement de rendez-vous : il transforme le code
+à six chiffres en connexion WebRTC directe, puis les données de jeu circulent
+entre les deux navigateurs.
 
 ## 2. Stack
 
 - Vite + React + TypeScript.
 - CSS natif avec variables de design, pas de framework UI.
 - SVG pour le plateau et les gemmes.
-- `fflate` pour la compression deflate + base64url.
+- `peerjs` pour le rendez-vous par code à six chiffres et le canal WebRTC.
 - `vite-plugin-pwa` pour le manifeste, le service worker et l'invite de mise à
   jour.
 - Vitest + Testing Library pour les tests.
@@ -40,10 +41,14 @@ l'invité renvoie une réponse compressée.
 │   ├── ARCHITECTURE.md
 │   └── PROTOCOL.md
 ├── public/
+│   ├── .nojekyll
+│   ├── favicon.svg
 │   ├── icon.svg
+│   ├── maskable.svg
 │   ├── pwa-192x192.png
 │   ├── pwa-512x512.png
 │   ├── pwa-maskable-512x512.png
+│   ├── robots.txt
 │   └── apple-touch-icon.png
 ├── src/
 │   ├── engine/
@@ -57,17 +62,17 @@ l'invité renvoie une réponse compressée.
 │   │   ├── cellScan.ts
 │   │   ├── mine.ts
 │   │   ├── endgame.ts
-│   │   ├── serialize.ts
 │   │   └── index.ts
 │   ├── net/
-│   │   ├── signaling.ts
+│   │   ├── roomCode.ts
+│   │   ├── integrity.ts
 │   │   ├── protocol.ts
 │   │   ├── peer.ts
 │   │   └── session.ts
 │   ├── state/
-│   │   ├── appState.tsx
-│   │   ├── gameReducer.ts
-│   │   ├── notes.ts
+│   │   ├── matchReducer.ts
+│   │   ├── useMatch.ts
+│   │   ├── integrityCheck.ts
 │   │   └── settings.ts
 │   ├── hooks/
 │   │   ├── useHashRoute.ts
@@ -75,11 +80,12 @@ l'invité renvoie une réponse compressée.
 │   │   ├── usePwaUpdate.ts
 │   │   └── usePersistentState.ts
 │   ├── components/
-│   │   ├── board/
-│   │   ├── mine/
-│   │   ├── game/
-│   │   ├── signaling/
-│   │   └── ui/
+│   │   ├── AppHeader.tsx
+│   │   ├── Board.tsx
+│   │   ├── ColorChip.tsx
+│   │   ├── Dialog.tsx
+│   │   ├── MineComposer.tsx
+│   │   └── PwaBanner.tsx
 │   ├── screens/
 │   ├── i18n/fr.ts
 │   ├── styles/
@@ -252,9 +258,10 @@ arête, ce qui évite les ambiguïtés.
 
 ### 6.1 État public répliqué
 
-`gameReducer` contient uniquement des données publiques :
+`matchReducer` regroupe l'état public de la session et celui de la partie :
 
-- phase, tour, premier joueur, dernier tour ;
+- rôle, nom, code de salon, phase de session, adversaire, nonce et engagement ;
+- `GameState` : phase, tour, premier joueur, dernier tour ;
 - journal des scans et confirmations ;
 - propositions et résultat ;
 - gagnant et raison.
@@ -267,59 +274,73 @@ du canal de données sont la source des actions distantes.
 - `localMine` : mine secrète verrouillée, sel, engagement.
 - `notes` : pièces candidates et marques locales.
 - `settings` : options de règles et d'accessibilité.
-- `session` : rôle, offres/réponses, état de connexion.
+- `session` : rôle, code de salon, phase (salon, placement, attente, prête) et
+  état de connexion.
 
 Les notes et la mine ne sont jamais incluses dans les messages publics avant la
 révélation finale.
 
-### 6.3 Contexte
+### 6.3 Composition de l'interface
 
-Un `AppProvider` fournit :
+Il n'y a pas de contexte global ni d'`AppProvider`. `App` est le point de
+composition :
 
-- le routeur hash ;
-- la session pair-à-pair ;
-- l'état public de la partie ;
-- la mine locale et les notes ;
-- les actions (scan, confirmation, proposition, révélation).
+- `useMatch(settings)` possède la `MatchSession`, le `matchReducer` et les
+  actions (créer, rejoindre, lancer le placement, verrouiller la mine, scans,
+  confirmations, proposition, révélation) ;
+- `useHashRoute()` expose la route courante et la navigation ;
+- `usePersistentState('player-name')` mémorise le nom du joueur ;
+- `usePwaUpdate(matchInProgress)` diffère les mises à jour pendant une partie.
 
-Les écrans consomment des hooks spécialisés (`useMatch`, `useSession`,
-`useNotes`, `useLocalMine`) pour éviter un contexte monolithique.
+`App` transmet aux écrans uniquement les données et les actions dont ils ont
+besoin. Les notes privées restent locales à l'écran de prospection. La
+navigation suit la session : accueil → salon → placement → partie.
 
-## 7. Réseau et signalisation
+## 7. Réseau et rendez-vous
 
-### 7.1 Format des codes
+### 7.1 Code de salon
 
-- Offre/réponse SDP : JSON `{ v: 1, type: 'offer'|'answer', sdp: string }`.
-- Compression : `fflate.deflateSync` sur UTF-8, puis base64url.
-- Lien d'invitation : `location.origin + location.pathname + '#/invite/' + code`.
-- Code de réponse : même encodage, affiché dans un champ copiable.
-- Aucun candidat ICE n'est échangé après la description : on attend
-  `icegatheringstate === 'complete'` (ou un délai maximal) avant de compresser.
+- Six chiffres, affichés par groupes de trois : `123 456`.
+- Normalisation : les espaces, tirets et caractères non numériques sont ignorés.
+- Identifiant PeerJS réservé : `prisme-v1-<code>`.
+- L'hôte tire un code cryptographique. Si l'identifiant est déjà pris, il en
+  retire un autre, jusqu'à huit tentatives.
+- Le code n'est affiché qu'une fois le pair réellement enregistré auprès du
+  courtier.
 
-### 7.2 WebRTC
+### 7.2 WebRTC et PeerJS
 
-- `RTCPeerConnection` avec serveurs STUN publics uniquement.
-- Un seul canal de données fiable et ordonné, label `prisme`.
-- L'hôte crée le canal ; l'invité écoute `ondatachannel`.
-- Pas de TURN. En cas d'échec, message explicite et proposition de réessayer.
-- Une fois la réponse acceptée, l'hôte laisse 30 secondes à la connexion pour
-  aboutir ; sans canal ouvert, la session passe en échec et propose de réessayer.
-- Pas de reconnexion automatique : une coupure met la partie en pause et invite
-  à créer une nouvelle session.
+- `peerjs` avec le courtier public `0.peerjs.com` sert uniquement au rendez-vous.
+- `RTCPeerConnection` avec serveurs STUN publics uniquement, pas de TURN.
+- Un seul canal de données fiable et ordonné, label `prisme`, sérialisation
+  JSON.
+- L'hôte écoute les connexions entrantes ; l'invité se connecte à
+  `prisme-v1-<code>`.
+- Pas de TURN. En cas d'échec, message explicite et proposition de réessayer sur
+  un autre réseau.
+- Délais : 15 s pour l'enregistrement PeerJS, 20 s pour rejoindre le salon ou
+  terminer la poignée de main.
+- Pas de reconnexion de partie : une coupure du canal met la partie en pause et
+  invite à créer un nouveau salon. Le pair PeerJS tente seulement de rétablir
+  son lien avec le courtier si celui-ci tombe.
 
 ### 7.3 Protocole
 
 Voir `docs/PROTOCOL.md`. Les messages sont des objets JSON avec un champ `type`
-et un `protocol: 1`. Ils sont validés par des guards avant application. Les
-messages inconnus sont ignorés.
+et `protocol: 2`. Ils sont validés par des guards avant application. Les
+messages inconnus ou mal formés sont ignorés.
 
 ### 7.4 Démarrage
 
-1. Chaque joueur verrouille sa mine et calcule `SHA-256(canonicalMine + salt)`.
-2. Échange `hello` : rôle, nom, nonce, engagement, version.
-3. L'hôte envoie `start` avec les deux nonces et le premier joueur calculé par
-   XOR. Les deux clients initialisent le même état.
-4. Le premier joueur agit.
+1. L'hôte réserve le code, ouvre le salon et attend.
+2. L'invité rejoint avec le code. Les deux échangent `hello`.
+3. L'hôte envoie `lobby-start` ; chaque joueur place sa mine.
+4. Chaque joueur verrouille sa mine et calcule `SHA-256(canonicalMine + salt)`,
+   puis envoie `commit`.
+5. Quand l'hôte a les deux engagements, il envoie `start` avec les deux nonces,
+   les deux hashes et le premier joueur calculé par XOR. Les deux clients
+   initialisent le même état.
+6. Le premier joueur agit.
 
 ## 8. Intégrité
 
@@ -349,8 +370,9 @@ messages inconnus sont ignorés.
 
 - **Moteur** : pièces, rotations, aires, mélange, rayons, boucles, validation,
   scan de case, fin de partie, sérialisation.
-- **Réseau** : aller-retour de compression, validation des messages, calcul du
-  premier joueur, machine de session (hôte/invité) avec un faux PeerConnection.
+- **Réseau** : code de salon, validation des messages, calcul du premier joueur,
+  machine de session (hôte/invité) avec un faux pair PeerJS, échange des
+  engagements et démarrage.
 - **Interface** : smoke tests des écrans, placement d'une pièce, affichage des
   erreurs, dialogue de confirmation.
 - **Build** : `npm run build` doit produire un `dist/` sans erreur et avec des
@@ -380,7 +402,7 @@ messages inconnus sont ignorés.
 | Décision                 | Justification                                                     |
 | ------------------------ | ----------------------------------------------------------------- |
 | Pas de backend           | Contrainte du projet ; GitHub Pages statique.                     |
-| Signalisation manuelle   | Aucun serveur ; compatible PWA statique.                          |
+| Code à six chiffres      | Simple à dicter ; le courtier public PeerJS sert de rendez-vous.  |
 | STUN seulement           | Pas d'infrastructure TURN ; limite acceptée et documentée.        |
 | Mine autoritaire locale  | Chaque joueur calcule ses réponses ; la confiance est nécessaire. |
 | Engagement + révélation  | Détection a posteriori des modifications de mine.                 |

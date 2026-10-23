@@ -7,22 +7,18 @@ afterEach(cleanup);
 
 function renderPlacement() {
   const onLock = vi.fn(async () => ({ ok: true as const }));
-  const onContinue = vi.fn();
-  const onBack = vi.fn();
   const utils = render(
     <PlacementScreen
       role="host"
       playerName="Camille"
-      inviteCode={null}
+      opponentName="Alex"
       locked={null}
       settings={DEFAULT_SETTINGS}
       error={null}
       onLock={onLock}
-      onContinue={onContinue}
-      onBack={onBack}
     />,
   );
-  return { ...utils, onLock, onContinue, onBack };
+  return { ...utils, onLock };
 }
 
 describe('PlacementScreen', () => {

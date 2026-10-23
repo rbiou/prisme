@@ -161,11 +161,12 @@ réflexions par sécurité et signale toute anomalie.
 
 ### 7.1 Mise en place
 
-1. Les deux joueurs placent leur mine secrète et la valident.
-2. Une connexion pair-à-pair est établie par lien d'invitation et code de
-   réponse.
-3. Les deux joueurs échangent un engagement SHA-256 de leur mine et un nonce.
-4. Le premier joueur est désigné par un tirage équitable à partir des deux
+1. L'hôte crée un salon et partage le code à six chiffres.
+2. L'invité rejoint la partie avec ce code ; la connexion directe s'établit.
+3. L'hôte lance la partie. Les deux joueurs placent alors leur mine secrète et
+   la valident.
+4. Les deux joueurs échangent un engagement SHA-256 de leur mine et un nonce.
+5. Le premier joueur est désigné par un tirage équitable à partir des deux
    nonces. Le joueur désigné commence comme prospecteur.
 
 ### 7.2 Tour de jeu

@@ -4,9 +4,9 @@
 
 Prisme est une PWA de déduction pour deux joueurs. Chacun cache une mine de
 cinq gemmes et interroge les rayons de la mine adverse pour en déduire la
-disposition exacte. La partie se joue à distance, sans serveur : la connexion
-est établie en pair-à-pair par WebRTC, avec une signalisation manuelle par lien
-et code de réponse.
+disposition exacte. La partie se joue à distance, sans backend propre : un
+courtier public PeerJS transforme un code à six chiffres en rendez-vous WebRTC,
+puis les échanges passent directement entre les deux navigateurs.
 
 ## 2. Public et contexte
 
@@ -23,8 +23,8 @@ et code de réponse.
    la fin.
 2. Proposer une prospection fluide : tir de rayon, scan de case, notes locales,
    simulation sur les hypothèses, journal des réponses.
-3. Établir une connexion pair-à-pair sans backend, avec des codes faciles à
-   partager.
+3. Établir une connexion pair-à-pair sans backend propre, avec un code à six
+   chiffres facile à partager.
 4. Être installable comme PWA sur l'écran d'accueil et se mettre à jour sans
    interrompre une partie.
 5. Fonctionner sur GitHub Pages, y compris dans un sous-répertoire.
@@ -34,8 +34,8 @@ et code de réponse.
 - Trois joueurs et plus.
 - Extensions Diamant et Corps noir.
 - Appariement automatique, comptes, classement, chat.
-- Serveur de signalisation, TURN, stockage cloud.
-- QR code de signalisation (prévu plus tard).
+- Courtier de rendez-vous auto-hébergé, TURN, stockage cloud.
+- QR code du code de salon (prévu plus tard).
 - Mode hors ligne complet avec reprise d'une connexion WebRTC.
 - Anti-triche fort : la confiance reste nécessaire, avec vérification a
   posteriori.
@@ -44,36 +44,41 @@ et code de réponse.
 
 ### 5.1 Accueil
 
+- Champ **Votre nom**.
 - Bouton **Créer une partie**.
-- Bouton **Rejoindre une invitation** (coller un lien ou un code).
+- Bouton **Rejoindre une partie** avec un champ de code à six chiffres.
 - Accès aux **Règles** et aux **Réglages** (règle de symétrie 2025, réduction
   des animations).
 - Bandeau discret si une mise à jour PWA est disponible.
 
 ### 5.2 Création d'une partie (hôte)
 
-1. Placer les cinq gemmes sur le plateau **Ma mine**.
-2. Le panneau de validation indique en temps réel les contraintes restantes.
-3. Une fois la mine valide, **Verrouiller ma mine**.
-4. Le client crée une offre WebRTC et affiche :
-   - un lien d'invitation ;
-   - un bouton **Partager** (Web Share API) et **Copier** ;
-   - un champ pour coller le code de réponse de l'adversaire ;
-   - l'état de la connexion.
-5. L'hôte partage le lien, attend le code de réponse, le colle, puis
-   **Connecter**.
-6. Une fois le canal ouvert et les deux joueurs prêts, la partie démarre.
+1. Saisir son nom, puis **Créer une partie**.
+2. Le client réserve un code à six chiffres auprès du courtier public et ouvre
+   le **salon**. Le code est affiché en grand, avec **Partager** et
+   **Copier**.
+3. L'hôte attend que l'adversaire rejoigne. Le nom de l'invité apparaît dès que
+   la connexion directe est établie.
+4. L'hôte clique **Lancer la partie**.
+5. Les deux joueurs placent alors leur mine. La partie démarre automatiquement
+   quand les deux mines sont verrouillées et les engagements échangés.
 
 ### 5.3 Rejoindre une partie (invité)
 
-1. Ouvrir le lien d'invitation : l'écran de placement s'affiche avec un bandeau
-   « Invitation reçue ».
-2. Placer et verrouiller sa mine.
-3. **Générer ma réponse** : le client crée la réponse WebRTC et affiche un code
-   à renvoyer à l'hôte, avec **Partager** et **Copier**.
-4. Attendre que l'hôte connecte. Une fois le canal ouvert, la partie démarre.
+1. Saisir son nom et le code à six chiffres, puis **Rejoindre**.
+2. Le client se connecte au salon et affiche l'attente de l'hôte.
+3. Quand l'hôte lance la partie, l'invité place et verrouille sa mine.
+4. La partie démarre dès que les deux engagements sont échangés.
 
-### 5.4 Partie
+### 5.4 Placement des mines
+
+Chaque joueur compose sa mine sur le plateau **Ma mine**. Le panneau de
+validation indique en temps réel les contraintes restantes. Une fois la mine
+valide, **Verrouiller ma mine** calcule l'engagement SHA-256 et l'envoie à
+l'adversaire. L'écran d'attente affiche le nom de l'adversaire jusqu'au
+démarrage.
+
+### 5.5 Partie
 
 Deux onglets principaux :
 
@@ -141,11 +146,11 @@ l'adversaire », « Réponse en attente de confirmation », « Dernier tour ».
 | --- | -------------------------------------------------------------------------------------------------- |
 | F01 | Placer les cinq gemmes avec rotations de 90°, sur la grille, sans chevauchement.                   |
 | F02 | Valider en temps réel les contraintes de placement et de rayons.                                   |
-| F03 | Verrouiller la mine avant l'échange de signalisation.                                              |
-| F04 | Créer une offre WebRTC compressée dans un lien partageable.                                        |
-| F05 | Créer une réponse WebRTC compressée dans un code partageable.                                      |
-| F06 | Établir un canal de données fiable et ordonné.                                                     |
-| F07 | Échanger les engagements de mine et choisir le premier joueur.                                     |
+| F03 | Réserver un salon avec un code à six chiffres et attendre l'adversaire.                            |
+| F04 | Rejoindre un salon à partir du code à six chiffres.                                                |
+| F05 | Afficher le code du salon, le partager et voir l'adversaire connecté.                              |
+| F06 | Établir un canal de données fiable et ordonné après le rendez-vous PeerJS.                         |
+| F07 | Lancer le placement depuis le salon, puis échanger les engagements et choisir le premier joueur.   |
 | F08 | Tirer un rayon, calculer localement la réponse, la faire confirmer, envoyer seulement le résultat. |
 | F09 | Scanner une case avec une règle déterministe.                                                      |
 | F10 | Tenir un journal public des scans et confirmations.                                                |
@@ -154,7 +159,7 @@ l'adversaire », « Réponse en attente de confirmation », « Dernier tour ».
 | F13 | Révéler les mines et vérifier l'engagement à la fin.                                               |
 | F14 | Installer la PWA, cacher l'interface, proposer les mises à jour.                                   |
 | F15 | Fonctionner sur GitHub Pages avec des URLs en hash.                                                |
-| F16 | Afficher des messages clairs en cas d'échec de connexion (NAT, STUN).                              |
+| F16 | Afficher des messages clairs en cas d'échec de connexion (NAT, STUN, courtier indisponible).       |
 
 ## 7. Exigences non fonctionnelles
 
@@ -167,7 +172,8 @@ l'adversaire », « Réponse en attente de confirmation », « Dernier tour ».
 - **Robustesse** : messages réseau validés, état idempotent, aucune mine
   envoyée avant la fin.
 - **Confidentialité** : pas de compte, pas d'analytics, pas de cookie, pas de
-  stockage serveur. Les codes de signalisation contiennent des candidats ICE.
+  stockage serveur. Le courtier public PeerJS ne reçoit que l'identifiant du
+  salon et les métadonnées de connexion, jamais la mine ni les réponses.
 - **Hors ligne** : l'interface et les règles sont disponibles hors ligne ; une
   partie en cours nécessite la connexion pair-à-pair.
 
@@ -176,8 +182,8 @@ l'adversaire », « Réponse en attente de confirmation », « Dernier tour ».
 1. Un joueur peut placer les cinq pièces, tourner, déplacer, supprimer et voir
    les erreurs de validation.
 2. Une mine valide peut être verrouillée et produit un engagement SHA-256.
-3. Deux navigateurs peuvent se connecter via un lien d'invitation et un code de
-   réponse, sans serveur.
+3. Deux navigateurs peuvent se connecter via un code à six chiffres, sans
+   backend propre, et échanger les données de jeu en WebRTC direct.
 4. Un tir de rayon produit le bon point de sortie et la bonne couleur pour les
    16 combinaisons, avec réflexions et détection de boucle.
 5. Un scan de case produit une réponse déterministe.
@@ -206,20 +212,21 @@ l'adversaire », « Réponse en attente de confirmation », « Dernier tour ».
 
 ## 10. Risques et parades
 
-| Risque                      | Parade                                                                                |
-| --------------------------- | ------------------------------------------------------------------------------------- |
-| NAT strict, pas de TURN     | STUN public, message d'erreur, conseil Wi-Fi, réessai, nouvelle invitation.           |
-| Lien d'invitation trop long | Compression, Web Share, copie, indication de coller le code complet.                  |
-| Perte de connexion          | Écran explicite, partie non reprise automatiquement, nouvelle invitation.             |
-| Triche du défenseur         | Engagement de mine, révélation finale, rejeu des réponses, avertissement d'intégrité. |
-| Ambiguïté de scan de case   | Règle de plus grande surface, documentée et testée.                                   |
-| Boucle de rayon             | Rejet de la mine et message avec l'entrée fautive.                                    |
-| Dépassement du plateau      | Validation en temps réel et surbrillance.                                             |
-| Rechargement accidentel     | Brouillon de mine en session, avertissement avant de quitter une partie.              |
+| Risque                       | Parade                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------- |
+| NAT strict, pas de TURN      | STUN public, message d'erreur, conseil Wi-Fi, réessai, nouveau salon.                 |
+| Courtier PeerJS indisponible | Message explicite, réessai, code régénéré si l'identifiant est déjà pris.             |
+| Code à six chiffres deviné   | Salon visible par l'hôte avant lancement, code non secret fort, partie courte.        |
+| Perte de connexion           | Écran explicite, partie non reprise automatiquement, nouveau salon.                   |
+| Triche du défenseur          | Engagement de mine, révélation finale, rejeu des réponses, avertissement d'intégrité. |
+| Ambiguïté de scan de case    | Règle de plus grande surface, documentée et testée.                                   |
+| Boucle de rayon              | Rejet de la mine et message avec l'entrée fautive.                                    |
+| Dépassement du plateau       | Validation en temps réel et surbrillance.                                             |
+| Rechargement accidentel      | Brouillon de mine en session, avertissement avant de quitter une partie.              |
 
 ## 11. Roadmap envisagée
 
-1. QR code pour la signalisation.
+1. QR code pour partager le code de salon.
 2. Mode entraînement contre une mine générée localement.
 3. Extensions Diamant et Corps noir.
 4. Trois joueurs et plus.

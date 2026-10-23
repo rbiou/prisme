@@ -203,8 +203,9 @@ export function RulesScreen({ onBack }: { onBack: () => void }) {
             preuve forte en temps réel.
           </p>
           <p className="fine-print">
-            Aucun serveur, aucun compte, aucun cookie. Les codes de signalisation contiennent des
-            adresses réseau temporaires : ne les partagez qu’avec votre adversaire.
+            Aucun backend propre, aucun compte, aucun cookie. Le code à six chiffres sert de
+            rendez-vous via un courtier public ; la connexion et les données de jeu passent ensuite
+            directement entre les deux navigateurs.
           </p>
         </section>
       </article>
