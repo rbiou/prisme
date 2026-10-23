@@ -5,6 +5,8 @@ cache une mine de cinq gemmes, puis tente de reconstituer celle de l'adversaire
 en tirant des rayons et en interrogeant des cases. Application 100 % frontend,
 pair-à-pair, sans serveur.
 
+**Jouer :** [https://rbiou.github.io/prisme/](https://rbiou.github.io/prisme/)
+
 ## Démarrage
 
 ```bash
