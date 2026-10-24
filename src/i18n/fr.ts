@@ -62,6 +62,12 @@ export const fr = {
     edgeHint:
       'Choisissez un côté et la couleur de la gemme concernée, puis touchez une case. Touchez à nouveau la même arête pour la retirer.',
     clearEdges: 'Effacer les arêtes',
+    scanTool: 'Sonder',
+    scanHint: 'Touchez une case pour l’interroger, ou une étiquette de bord pour tirer un rayon.',
+    dotTool: 'Ronds',
+    dotHint:
+      'Choisissez la couleur de la gemme, puis touchez une case. Touchez à nouveau avec la même couleur pour retirer le rond.',
+    clearDots: 'Effacer les ronds',
     coordinateLabel: 'Coordonnées d’ancrage',
     coordinatePlaceholder: 'E4',
     placeAt: 'Placer',
@@ -71,6 +77,9 @@ export const fr = {
     invalid: 'Mine incomplète ou invalide',
     lock: 'Verrouiller ma mine',
     locking: 'Calcul de l’engagement…',
+    randomize: 'Placer au hasard',
+    randomizeHint:
+      'Tire une mine valide au hasard. Vous pourrez encore la modifier avant de la verrouiller.',
     lockedNote: 'Une fois verrouillée, votre mine ne peut plus être modifiée pour cette partie.',
     incomplete: 'Placez les cinq gemmes pour continuer.',
     secret: 'Privé — cette mine n’est jamais envoyée avant la fin de la partie.',
@@ -130,6 +139,8 @@ export const fr = {
     confirmAgain: 'Confirmer à nouveau',
     submit: 'Soumettre ma proposition',
     submitDisabled: 'Complétez une mine valide dans vos notes.',
+    submitNeedsScan:
+      'Revenez à l’outil Sonder (aucun outil de note actif) pour soumettre votre proposition.',
     submitTitle: 'Soumettre cette mine ?',
     submitWarning:
       'Une proposition incorrecte termine immédiatement la partie. Vérifiez chaque forme, orientation et position.',

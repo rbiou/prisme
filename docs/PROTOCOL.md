@@ -156,10 +156,15 @@ incorrecte termine immédiatement la partie.
 
 ```ts
 { protocol: 3, type: 'reveal', id: string, from: PlayerId,
-  mine: SerializedMine, salt: string }
+  mine: SerializedMine, salt: string,
+  notes?: SerializedNote | null,
+  marks?: { crosses: Cell[], edges: NoteEdgeMark[], colors: ColorMark[] } | null }
 ```
 
-Envoyé après la fin de partie. Le destinataire vérifie :
+Envoyé après la fin de partie. `notes` contient de zéro à cinq pièces
+candidates : les notes finales du joueur, partagées uniquement à ce moment pour
+expliquer son raisonnement. `marks` contient les croix, arêtes et ronds de
+couleur de ses notes. Le destinataire vérifie :
 `SHA-256(canonicalMine + ':' + salt) === mineHash` reçu dans `commit` et
 `start`. Il peut ensuite rejouer les scans et comparer les réponses.
 
@@ -171,7 +176,8 @@ Envoyé après la fin de partie. Le destinataire vérifie :
   mineHash: string | null,
   starter: PlayerId | null,
   game: GameState | null,
-  reveals: Array<{ from: PlayerId, mine: SerializedMine, salt: string }> }
+  reveals: Array<{ from: PlayerId, mine: SerializedMine, salt: string,
+                   notes: SerializedNote | null, marks: RevealMarks | null }> }
 ```
 
 Échangé dès la réouverture du canal, après une coupure ou une reprise de
@@ -294,6 +300,10 @@ Prospecteur                  Défenseur
 - `nonce` doit faire 32 caractères hexadécimaux ; `mineHash` 64 ; `salt` 32.
 - Un `sync` doit contenir un `round` entier positif et un `game` structurellement
   valide (phases, tours, scans, propositions, gagnant).
+- `notes` accepte de zéro à cinq pièces candidates, sans doublon de type, avec
+  rotation 0–3 et coordonnées entières.
+- `marks` ne peut contenir que des cases, arêtes et ronds valides, dans les
+  limites du plateau ; les tableaux sont bornés.
 - Un message dont le `id` a déjà été vu est ignoré.
 - Un message qui n'entre pas dans la phase courante est ignoré et journalisé.
 

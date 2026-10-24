@@ -1,4 +1,4 @@
-import { isCell } from './board';
+import { BOARD_HEIGHT, BOARD_WIDTH, isCell } from './board';
 import { polygonsEqual } from './geometry';
 import {
   BASE_PIECE_KINDS,
@@ -10,7 +10,14 @@ import {
   piecePolygon,
 } from './pieces';
 import { validatePieces } from './placement';
-import type { Mine, PieceKind, PlacedPiece, SerializedMine, SerializedPiece } from './types';
+import type {
+  Mine,
+  PieceKind,
+  PlacedPiece,
+  SerializedMine,
+  SerializedNote,
+  SerializedPiece,
+} from './types';
 
 export function createEmptyMine(): Mine {
   return { version: 1, pieces: [] };
@@ -52,6 +59,30 @@ export function serializeMine(mine: Mine): SerializedMine {
   return { version: 1, pieces };
 }
 
+function isSerializedPieceValue(value: unknown, seen: Set<PieceKind>): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const piece = value as Record<string, unknown>;
+  if (
+    typeof piece.kind !== 'string' ||
+    !isPieceKind(piece.kind) ||
+    typeof piece.rotation !== 'number' ||
+    !isRotation(piece.rotation) ||
+    typeof piece.x !== 'number' ||
+    typeof piece.y !== 'number' ||
+    !Number.isInteger(piece.x) ||
+    !Number.isInteger(piece.y) ||
+    piece.x < 0 ||
+    piece.x >= BOARD_WIDTH ||
+    piece.y < 0 ||
+    piece.y >= BOARD_HEIGHT
+  ) {
+    return false;
+  }
+  if (seen.has(piece.kind)) return false;
+  seen.add(piece.kind);
+  return true;
+}
+
 export function isSerializedMine(value: unknown): value is SerializedMine {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as { version?: unknown; pieces?: unknown };
@@ -60,31 +91,38 @@ export function isSerializedMine(value: unknown): value is SerializedMine {
 
   const seen = new Set<PieceKind>();
   for (const item of candidate.pieces) {
-    if (!item || typeof item !== 'object') return false;
-    const piece = item as Record<string, unknown>;
-    if (
-      typeof piece.kind !== 'string' ||
-      !isPieceKind(piece.kind) ||
-      typeof piece.rotation !== 'number' ||
-      !isRotation(piece.rotation) ||
-      typeof piece.x !== 'number' ||
-      typeof piece.y !== 'number' ||
-      !Number.isInteger(piece.x) ||
-      !Number.isInteger(piece.y)
-    ) {
-      return false;
-    }
-    if (seen.has(piece.kind)) return false;
-    seen.add(piece.kind);
+    if (!isSerializedPieceValue(item, seen)) return false;
   }
   return BASE_PIECE_KINDS.every((kind) => seen.has(kind));
 }
 
-export function deserializeMine(serialized: SerializedMine): Mine {
+export function isSerializedNote(value: unknown): value is SerializedNote {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as { version?: unknown; pieces?: unknown };
+  if (candidate.version !== 1 || !Array.isArray(candidate.pieces)) return false;
+  if (candidate.pieces.length > BASE_PIECE_KINDS.length) return false;
+  const seen = new Set<PieceKind>();
+  for (const item of candidate.pieces) {
+    if (!isSerializedPieceValue(item, seen)) return false;
+  }
+  return true;
+}
+
+export function serializeNote(mine: Mine): SerializedNote {
+  const pieces: SerializedPiece[] = sortMinePieces(mine.pieces).map((piece) => ({
+    kind: piece.kind,
+    rotation: canonicalRotation(piece.kind, piece.rotation),
+    x: piece.x,
+    y: piece.y,
+  }));
+  return { version: 1, pieces };
+}
+
+export function deserializeNote(note: SerializedNote): Mine {
   return {
     version: 1,
     pieces: sortMinePieces(
-      serialized.pieces.map((piece) => ({
+      note.pieces.map((piece) => ({
         id: piece.kind,
         kind: piece.kind,
         color: colorForKind(piece.kind),
@@ -94,6 +132,10 @@ export function deserializeMine(serialized: SerializedMine): Mine {
       })),
     ),
   };
+}
+
+export function deserializeMine(serialized: SerializedMine): Mine {
+  return deserializeNote(serialized);
 }
 
 export function canonicalMineJson(mine: Mine): string {

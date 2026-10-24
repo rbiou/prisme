@@ -5,13 +5,16 @@ import {
   checkSolution,
   createEmptyMine,
   deserializeMine,
+  deserializeNote,
   getPiece,
   isCellCoordinate,
   isCompleteMine,
   isSerializedMine,
+  isSerializedNote,
   mineEquals,
   removePiece,
   serializeMine,
+  serializeNote,
   upsertPiece,
 } from './mine';
 import type { Mine, SerializedMine } from './types';
@@ -126,6 +129,18 @@ describe('sérialisation et comparaison de mine', () => {
     mine = removePiece(mine, 'red-parallelogram');
     expect(getPiece(mine, 'red-parallelogram')).toBeUndefined();
     expect(isCompleteMine(mine)).toBe(false);
+  });
+
+  it('sérialise et relit des notes incomplètes', () => {
+    const note = {
+      version: 1 as const,
+      pieces: serializeNote({ version: 1, pieces: VALID_PIECES.slice(0, 2) }).pieces,
+    };
+    expect(isSerializedNote(note)).toBe(true);
+    expect(isSerializedMine(note)).toBe(false);
+    expect(deserializeNote(note).pieces).toHaveLength(2);
+    expect(isSerializedNote({ version: 1, pieces: [] })).toBe(true);
+    expect(isSerializedNote({ version: 1, pieces: [...note.pieces, note.pieces[0]] })).toBe(false);
   });
 
   it('reconnaît des coordonnées de case valides', () => {

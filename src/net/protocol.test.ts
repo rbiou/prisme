@@ -86,13 +86,41 @@ describe('protocole réseau', () => {
     expect(parse({ ...start, guestHash: undefined })).toBeNull();
   });
 
+  it('accepte une révélation avec les notes finales', () => {
+    const notes = { version: 1 as const, pieces: CANDIDATE.pieces.slice(0, 2) };
+    const reveal = {
+      protocol: PROTOCOL_VERSION,
+      type: 'reveal',
+      id: 'reveal-notes',
+      from: 'guest',
+      mine: CANDIDATE,
+      salt: SALT,
+      notes,
+    };
+    expect(parse(reveal)).not.toBeNull();
+    expect(
+      parse({ ...reveal, notes: { version: 1, pieces: [...notes.pieces, notes.pieces[0]] } }),
+    ).toBeNull();
+    expect(parse({ ...reveal, notes: null })).not.toBeNull();
+    expect(
+      parse({ ...reveal, notes: null, marks: { crosses: [], edges: [], colors: [] } }),
+    ).not.toBeNull();
+    expect(
+      parse({
+        ...reveal,
+        notes: null,
+        marks: { crosses: [{ col: 10, row: 0 }], edges: [], colors: [] },
+      }),
+    ).toBeNull();
+  });
+
   it('accepte un état de partie synchronisé', () => {
     const sync = createSync('host', {
       round: 3,
       mineHash: HASH_A,
       starter: 'host',
       game: createGame('host'),
-      reveals: [{ from: 'guest', mine: CANDIDATE, salt: SALT }],
+      reveals: [{ from: 'guest', mine: CANDIDATE, salt: SALT, notes: null, marks: null }],
     });
     expect(parse(sync)).toMatchObject({
       type: 'sync',
@@ -100,7 +128,7 @@ describe('protocole réseau', () => {
       round: 3,
       mineHash: HASH_A,
       starter: 'host',
-      reveals: [{ from: 'guest', mine: CANDIDATE, salt: SALT }],
+      reveals: [{ from: 'guest', mine: CANDIDATE, salt: SALT, notes: null, marks: null }],
     });
     expect(parse({ ...sync, round: -1 })).toBeNull();
     expect(parse({ ...sync, mineHash: 'court' })).toBeNull();

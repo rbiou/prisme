@@ -3,11 +3,18 @@ import { Board } from '../components/Board';
 import { ColorChip } from '../components/ColorChip';
 import { ColorMixLegend } from '../components/ColorMixLegend';
 import { Dialog } from '../components/Dialog';
-import { MineComposer } from '../components/MineComposer';
+import { MineComposer, type NoteTool } from '../components/MineComposer';
 import { ALL_ENTRIES, cellLabel, isCell, parseCellLabel, sideLabel } from '../engine/board';
 import { scanCell } from '../engine/cellScan';
+import { isColorMark, type ColorMark } from '../engine/colorMarks';
 import { canScan, canSubmit } from '../engine/endgame';
-import { checkSolution, deserializeMine, isSerializedMine, serializeMine } from '../engine/mine';
+import {
+  checkSolution,
+  deserializeMine,
+  deserializeNote,
+  isSerializedNote,
+  serializeMine,
+} from '../engine/mine';
 import { isNoteEdgeMark, type NoteEdgeMark } from '../engine/noteEdges';
 import { validateMine } from '../engine/placement';
 import { simulateRay } from '../engine/ray';
@@ -48,7 +55,7 @@ function loadNotes(key: string): Mine {
     const raw = window.sessionStorage.getItem(key);
     if (!raw) return { version: 1, pieces: [] };
     const parsed: unknown = JSON.parse(raw);
-    return isSerializedMine(parsed) ? deserializeMine(parsed) : { version: 1, pieces: [] };
+    return isSerializedNote(parsed) ? deserializeNote(parsed) : { version: 1, pieces: [] };
   } catch {
     return { version: 1, pieces: [] };
   }
@@ -83,6 +90,18 @@ function loadEdgeMarks(key: string): NoteEdgeMark[] {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(isNoteEdgeMark);
+  } catch {
+    return [];
+  }
+}
+
+function loadColorMarks(key: string): ColorMark[] {
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isColorMark);
   } catch {
     return [];
   }
@@ -219,11 +238,13 @@ export function GameScreen({
   const notesKey = `prisme:notes:${state.readyAt ?? 'local'}`;
   const crossesKey = `prisme:crosses:${state.readyAt ?? 'local'}`;
   const edgesKey = `prisme:edges:${state.readyAt ?? 'local'}`;
+  const dotsKey = `prisme:dots:${state.readyAt ?? 'local'}`;
   const [tab, setTab] = useState<'prospection' | 'mine'>('prospection');
-  const [mode, setMode] = useState<'scan' | 'notes'>('scan');
+  const [tool, setTool] = useState<NoteTool>('scan');
   const [notes, setNotes] = useState<Mine>(() => loadNotes(notesKey));
   const [crosses, setCrosses] = useState<Cell[]>(() => loadCrosses(crossesKey));
   const [edgeMarks, setEdgeMarks] = useState<NoteEdgeMark[]>(() => loadEdgeMarks(edgesKey));
+  const [colorMarks, setColorMarks] = useState<ColorMark[]>(() => loadColorMarks(dotsKey));
   const [simulation, setSimulation] = useState<{ entryLabel: string; result: RayResult } | null>(
     null,
   );
@@ -258,6 +279,14 @@ export function GameScreen({
     }
   }, [edgeMarks, edgesKey]);
 
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(dotsKey, JSON.stringify(colorMarks));
+    } catch {
+      // Les ronds restent en mémoire si le stockage est indisponible.
+    }
+  }, [colorMarks, dotsKey]);
+
   const notesSimulationValidation = useMemo(
     () => validateMine(notes, { enforceWhiteSymmetry: settings.enforceWhiteSymmetry }),
     [notes, settings.enforceWhiteSymmetry],
@@ -281,6 +310,7 @@ export function GameScreen({
       state.sessionPhase !== 'closed');
   const canScanNow = canScan(game, role) && connected;
   const canSubmitNow = canSubmit(game, role) && connected;
+  const submitToolReady = tool === 'scan';
   const askedEntries = useMemo(
     () =>
       new Set(
@@ -391,6 +421,14 @@ export function GameScreen({
     setSubmitError(null);
   }
 
+  function scanCellFromGrid(cell: Cell) {
+    if (onCell(cell)) {
+      setCellError(null);
+    } else {
+      setCellError('La case n’a pas pu être sondée.');
+    }
+  }
+
   function submitCell(event: FormEvent) {
     event.preventDefault();
     const cell = parseCellLabel(cellInput);
@@ -427,6 +465,8 @@ export function GameScreen({
         role={role}
         game={game}
         myMine={myMine}
+        myNotes={notes}
+        myMarks={{ crosses, edges: edgeMarks, colors: colorMarks }}
         mySalt={locked.salt}
         myHash={locked.hash}
         opponentName={state.opponentName}
@@ -526,40 +566,39 @@ export function GameScreen({
             <div className="panel-heading">
               <div>
                 <p className="kicker">Prospection</p>
-                <h2>{mode === 'scan' ? 'Plateau adverse' : 'Vos notes privées'}</h2>
+                <h2>Vos notes privées</h2>
               </div>
-              <div className="mode-switch" role="group" aria-label="Mode du plateau">
-                <button
-                  type="button"
-                  className={`mode-button${mode === 'scan' ? ' is-active' : ''}`}
-                  onClick={() => setMode('scan')}
-                >
-                  {fr.game.modeScan}
-                </button>
-                <button
-                  type="button"
-                  className={`mode-button${mode === 'notes' ? ' is-active' : ''}`}
-                  onClick={() => setMode('notes')}
-                >
-                  {fr.game.modeNotes}
-                  <span className="private-badge">Privé</span>
-                </button>
-              </div>
+              <span className="badge badge--soft">Notes privées</span>
             </div>
 
-            {mode === 'scan' ? (
-              <>
-                <div className="board-frame">
-                  <Board
-                    notes={notes}
-                    askedEntries={askedEntries}
-                    interactiveEntries={canScanNow}
-                    interactiveCells={canScanNow}
-                    onEntryAction={onWave}
-                    onCellAction={onCell}
-                    ariaLabel="Plateau adverse : touchez une étiquette de bord pour tirer un rayon, ou une case pour l’interroger"
-                  />
-                </div>
+            <>
+              <div className="notes-banner">
+                <span>{fr.game.notesHint}</span>
+              </div>
+              <MineComposer
+                mine={notes}
+                onChange={updateNotes}
+                crosses={crosses}
+                onCrossesChange={setCrosses}
+                edgeMarks={edgeMarks}
+                onEdgeMarksChange={setEdgeMarks}
+                colorMarks={colorMarks}
+                onColorMarksChange={setColorMarks}
+                tool={tool}
+                onToolChange={(next) => {
+                  setTool(next);
+                  setCellError(null);
+                }}
+                scanEnabled={canScanNow}
+                onScanCell={scanCellFromGrid}
+                onScanEntry={onWave}
+                askedEntries={askedEntries}
+                showCoordinateInput={false}
+                boardAriaLabel="Plateau de notes privées : sondez les rayons et les cases tout en prenant vos notes"
+                path={simulation?.result.path ?? null}
+                pathColor={simulation?.result.color ?? 'white'}
+              />
+              {tool === 'scan' ? (
                 <form className="coordinate-row" onSubmit={submitCell}>
                   <label className="field field--inline">
                     <span>{fr.game.cellLabel}</span>
@@ -584,119 +623,93 @@ export function GameScreen({
                     {fr.game.scanCell}
                   </button>
                 </form>
-                {cellError ? (
-                  <p className="inline-alert" role="alert">
-                    {cellError}
+              ) : null}
+              {cellError ? (
+                <p className="inline-alert" role="alert">
+                  {cellError}
+                </p>
+              ) : null}
+              <div className="simulation-card">
+                <div className="simulation-heading">
+                  <h3>{fr.game.simulate}</h3>
+                  {simulation ? (
+                    <span
+                      className={`badge ${simulationMatches === false ? 'badge--danger' : 'badge--soft'}`}
+                    >
+                      {simulation.result.status === 'loop'
+                        ? 'Boucle'
+                        : `${privateRayLabel(simulation.result)} · ${RAY_COLOR_LABELS[simulation.result.color]}`}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="simulation-controls">
+                  <label className="field field--inline">
+                    <span>{fr.game.rayLabel}</span>
+                    <select value={simEntry} onChange={(event) => setSimEntry(event.target.value)}>
+                      <optgroup label="Haut">
+                        {ALL_ENTRIES.filter((entry) => entry.side === 'top').map((entry) => (
+                          <option key={entry.label} value={entry.label}>
+                            {entry.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Droite">
+                        {ALL_ENTRIES.filter((entry) => entry.side === 'right').map((entry) => (
+                          <option key={entry.label} value={entry.label}>
+                            {entry.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Bas">
+                        {ALL_ENTRIES.filter((entry) => entry.side === 'bottom').map((entry) => (
+                          <option key={entry.label} value={entry.label}>
+                            {entry.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Gauche">
+                        {ALL_ENTRIES.filter((entry) => entry.side === 'left').map((entry) => (
+                          <option key={entry.label} value={entry.label}>
+                            {entry.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    onClick={runSimulation}
+                    disabled={!notesSimulationValidation.ok}
+                  >
+                    Simuler
+                  </button>
+                </div>
+                {!notesSimulationValidation.ok ? (
+                  <p className="hint">{fr.game.simulationIncomplete}</p>
+                ) : null}
+                {matchingAnswer && matchingAnswer.answer.kind === 'wave' ? (
+                  <div
+                    className={`simulation-compare${simulationMatches === false ? ' is-mismatch' : ''}`}
+                  >
+                    <span>
+                      Réponse confirmée pour l’entrée {simulation?.entryLabel} : sortie{' '}
+                      {matchingAnswer.answer.exit.label},{' '}
+                      <ColorChip color={matchingAnswer.answer.color} size="small" />
+                    </span>
+                    {simulationMatches === false ? (
+                      <strong>Votre simulation contredit cette réponse.</strong>
+                    ) : (
+                      <strong>Simulation cohérente avec le journal.</strong>
+                    )}
+                  </div>
+                ) : simulation ? (
+                  <p className="hint">
+                    Aucune réponse confirmée pour l’entrée {simulation.entryLabel}.
                   </p>
                 ) : null}
-                <p className="hint">
-                  {canScanNow
-                    ? 'Les étiquettes tirent un rayon. Les cases répondent par une couleur ou « rien ».'
-                    : 'Attendez la réponse ou la confirmation de l’adversaire pour agir.'}
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="notes-banner">
-                  <span className="badge badge--soft">Notes privées</span>
-                  <span>{fr.game.notesHint}</span>
-                </div>
-                <MineComposer
-                  mine={notes}
-                  onChange={updateNotes}
-                  crosses={crosses}
-                  onCrossesChange={setCrosses}
-                  edgeMarks={edgeMarks}
-                  onEdgeMarksChange={setEdgeMarks}
-                  boardAriaLabel="Plateau de notes privées"
-                  path={simulation?.result.path ?? null}
-                  pathColor={simulation?.result.color ?? 'white'}
-                />
-                <div className="simulation-card">
-                  <div className="simulation-heading">
-                    <h3>{fr.game.simulate}</h3>
-                    {simulation ? (
-                      <span
-                        className={`badge ${simulationMatches === false ? 'badge--danger' : 'badge--soft'}`}
-                      >
-                        {simulation.result.status === 'loop'
-                          ? 'Boucle'
-                          : `${privateRayLabel(simulation.result)} · ${RAY_COLOR_LABELS[simulation.result.color]}`}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="simulation-controls">
-                    <label className="field field--inline">
-                      <span>{fr.game.rayLabel}</span>
-                      <select
-                        value={simEntry}
-                        onChange={(event) => setSimEntry(event.target.value)}
-                      >
-                        <optgroup label="Haut">
-                          {ALL_ENTRIES.filter((entry) => entry.side === 'top').map((entry) => (
-                            <option key={entry.label} value={entry.label}>
-                              {entry.label}
-                            </option>
-                          ))}
-                        </optgroup>
-                        <optgroup label="Droite">
-                          {ALL_ENTRIES.filter((entry) => entry.side === 'right').map((entry) => (
-                            <option key={entry.label} value={entry.label}>
-                              {entry.label}
-                            </option>
-                          ))}
-                        </optgroup>
-                        <optgroup label="Bas">
-                          {ALL_ENTRIES.filter((entry) => entry.side === 'bottom').map((entry) => (
-                            <option key={entry.label} value={entry.label}>
-                              {entry.label}
-                            </option>
-                          ))}
-                        </optgroup>
-                        <optgroup label="Gauche">
-                          {ALL_ENTRIES.filter((entry) => entry.side === 'left').map((entry) => (
-                            <option key={entry.label} value={entry.label}>
-                              {entry.label}
-                            </option>
-                          ))}
-                        </optgroup>
-                      </select>
-                    </label>
-                    <button
-                      type="button"
-                      className="btn btn--secondary"
-                      onClick={runSimulation}
-                      disabled={!notesSimulationValidation.ok}
-                    >
-                      Simuler
-                    </button>
-                  </div>
-                  {!notesSimulationValidation.ok ? (
-                    <p className="hint">{fr.game.simulationIncomplete}</p>
-                  ) : null}
-                  {matchingAnswer && matchingAnswer.answer.kind === 'wave' ? (
-                    <div
-                      className={`simulation-compare${simulationMatches === false ? ' is-mismatch' : ''}`}
-                    >
-                      <span>
-                        Réponse confirmée pour l’entrée {simulation?.entryLabel} : sortie{' '}
-                        {matchingAnswer.answer.exit.label},{' '}
-                        <ColorChip color={matchingAnswer.answer.color} size="small" />
-                      </span>
-                      {simulationMatches === false ? (
-                        <strong>Votre simulation contredit cette réponse.</strong>
-                      ) : (
-                        <strong>Simulation cohérente avec le journal.</strong>
-                      )}
-                    </div>
-                  ) : simulation ? (
-                    <p className="hint">
-                      Aucune réponse confirmée pour l’entrée {simulation.entryLabel}.
-                    </p>
-                  ) : null}
-                </div>
-              </>
-            )}
+              </div>
+            </>
           </section>
 
           <aside className="prospection-side">
@@ -714,11 +727,12 @@ export function GameScreen({
               {!notesStructureValidation.ok ? (
                 <p className="hint">{fr.game.submitDisabled}</p>
               ) : null}
+              {!submitToolReady ? <p className="hint">{fr.game.submitNeedsScan}</p> : null}
               <button
                 type="button"
                 className="btn btn--primary btn--wide"
                 onClick={() => setSubmitOpen(true)}
-                disabled={!canSubmitNow || !notesStructureValidation.ok}
+                disabled={!canSubmitNow || !notesStructureValidation.ok || !submitToolReady}
               >
                 {fr.game.submit}
               </button>

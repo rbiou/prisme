@@ -3,17 +3,20 @@ import { Board } from '../components/Board';
 import { ColorChip } from '../components/ColorChip';
 import { PrismMark } from '../components/AppHeader';
 import { otherPlayer, endReasonLabel } from '../engine/endgame';
-import { deserializeMine, serializeMine } from '../engine/mine';
+import { deserializeMine, deserializeNote, serializeMine } from '../engine/mine';
 import type { GameState, Mine, PlayerId } from '../engine/types';
 import { fr } from '../i18n/fr';
 import { verifyCommitment } from '../net/integrity';
 import { verifyReveal } from '../state/integrityCheck';
+import type { RevealMarks } from '../net/protocol';
 import type { RevealRecord } from '../state/matchReducer';
 
 export interface ResultScreenProps {
   role: PlayerId;
   game: GameState;
   myMine: Mine;
+  myNotes: Mine;
+  myMarks: RevealMarks;
   mySalt: string;
   myHash: string;
   opponentName: string;
@@ -47,6 +50,8 @@ export function ResultScreen({
   role,
   game,
   myMine,
+  myNotes,
+  myMarks,
   mySalt,
   myHash,
   opponentName,
@@ -60,6 +65,24 @@ export function ResultScreen({
   const remoteMine = useMemo(
     () => (remoteReveal ? deserializeMine(remoteReveal.mine) : null),
     [remoteReveal],
+  );
+  const remoteNotes = useMemo(
+    () => (remoteReveal?.notes ? deserializeNote(remoteReveal.notes) : null),
+    [remoteReveal],
+  );
+  const remoteMarks = remoteReveal?.marks ?? null;
+  const localHasMarks = myMarks.crosses.length + myMarks.edges.length + myMarks.colors.length > 0;
+  const remoteHasMarks = Boolean(
+    remoteMarks &&
+    remoteMarks.crosses.length + remoteMarks.edges.length + remoteMarks.colors.length > 0,
+  );
+  const mySubmission = useMemo(
+    () => [...game.submissions].reverse().find((submission) => submission.by === role) ?? null,
+    [game.submissions, role],
+  );
+  const remoteSubmission = useMemo(
+    () => [...game.submissions].reverse().find((submission) => submission.by === other) ?? null,
+    [game.submissions, other],
   );
   const [storedVerification, setVerification] = useState<VerificationState>(EMPTY_VERIFICATION);
   const [runId, setRunId] = useState(0);
@@ -254,6 +277,113 @@ export function ResultScreen({
           )}
         </section>
       </div>
+
+      <section className="result-reasoning">
+        <div className="panel-heading">
+          <div>
+            <p className="kicker">Après la partie</p>
+            <h2>Notes finales et propositions</h2>
+          </div>
+        </div>
+        <div className="result-mines result-notes">
+          <article className="card card--plain result-mine">
+            <div className="panel-heading">
+              <div>
+                <p className="kicker">Votre raisonnement</p>
+                <h3>Vos notes</h3>
+              </div>
+              <span className="badge badge--soft">
+                {myNotes.pieces.length > 0
+                  ? `${myNotes.pieces.length} gemme(s)`
+                  : localHasMarks
+                    ? 'Annotations'
+                    : 'Vide'}
+              </span>
+            </div>
+            {myNotes.pieces.length > 0 || localHasMarks ? (
+              <div className="board-frame board-frame--compact">
+                <Board
+                  mine={myNotes}
+                  crosses={myMarks.crosses}
+                  edgeMarks={myMarks.edges}
+                  colorMarks={myMarks.colors}
+                  ariaLabel="Vos notes finales"
+                />
+              </div>
+            ) : (
+              <p className="empty-state">Aucune note conservée.</p>
+            )}
+            {mySubmission ? (
+              <details className="reasoning-proposal">
+                <summary>
+                  Proposition soumise — {mySubmission.correct ? 'correcte' : 'incorrecte'}
+                </summary>
+                <div className="board-frame board-frame--compact">
+                  <Board
+                    mine={deserializeMine(mySubmission.candidate)}
+                    ariaLabel="Votre proposition soumise"
+                  />
+                </div>
+              </details>
+            ) : (
+              <p className="hint">Aucune proposition soumise.</p>
+            )}
+          </article>
+
+          <article className="card card--plain result-mine">
+            <div className="panel-heading">
+              <div>
+                <p className="kicker">Raisonnement adverse</p>
+                <h3>Notes de {opponentName}</h3>
+              </div>
+              {remoteReveal ? (
+                <span className="badge badge--soft">
+                  {remoteNotes && remoteNotes.pieces.length > 0
+                    ? `${remoteNotes.pieces.length} gemme(s)`
+                    : remoteHasMarks
+                      ? 'Annotations'
+                      : 'Non transmises'}
+                </span>
+              ) : (
+                <span className="badge badge--soft">En attente</span>
+              )}
+            </div>
+            {remoteReveal ? (
+              (remoteNotes && remoteNotes.pieces.length > 0) || remoteHasMarks ? (
+                <div className="board-frame board-frame--compact">
+                  <Board
+                    mine={remoteNotes ?? { version: 1, pieces: [] }}
+                    crosses={remoteMarks?.crosses ?? []}
+                    edgeMarks={remoteMarks?.edges ?? []}
+                    colorMarks={remoteMarks?.colors ?? []}
+                    ariaLabel={`Notes finales de ${opponentName}`}
+                  />
+                </div>
+              ) : (
+                <p className="empty-state">Aucune note transmise.</p>
+              )
+            ) : (
+              <p className="empty-state">{fr.result.revealPending}</p>
+            )}
+            {remoteSubmission ? (
+              <details className="reasoning-proposal">
+                <summary>
+                  Proposition de {opponentName} —{' '}
+                  {remoteSubmission.correct ? 'correcte' : 'incorrecte'}
+                </summary>
+                <div className="board-frame board-frame--compact">
+                  <Board
+                    mine={deserializeMine(remoteSubmission.candidate)}
+                    ariaLabel={`Proposition de ${opponentName}`}
+                  />
+                </div>
+              </details>
+            ) : (
+              <p className="hint">Aucune proposition soumise.</p>
+            )}
+          </article>
+        </div>
+      </section>
 
       <section
         className={`integrity-card${hasProblem ? ' integrity-card--bad' : checksComplete ? ' integrity-card--ok' : ''}`}

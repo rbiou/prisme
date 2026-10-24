@@ -88,6 +88,61 @@ describe('MineComposer — croix des notes privées', () => {
   });
 });
 
+describe('MineComposer — prospection et ronds de couleur', () => {
+  it('sonde une case en mode Sonder sans modifier les notes', () => {
+    const onChange = vi.fn();
+    const onScanCell = vi.fn();
+    render(
+      <MineComposer mine={EMPTY_MINE} onChange={onChange} onScanCell={onScanCell} scanEnabled />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Sonder' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(boardCells()[0] as Element);
+
+    expect(onScanCell).toHaveBeenCalledWith({ col: 0, row: 0 });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('pose un rond de la couleur choisie', () => {
+    const onColorMarksChange = vi.fn();
+    render(
+      <MineComposer
+        mine={EMPTY_MINE}
+        onChange={vi.fn()}
+        colorMarks={[]}
+        onColorMarksChange={onColorMarksChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ronds' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Jaune' }));
+    fireEvent.click(boardCells()[0] as Element);
+
+    expect(onColorMarksChange).toHaveBeenCalledWith([
+      { cell: { col: 0, row: 0 }, color: 'yellow' },
+    ]);
+  });
+
+  it('affiche les ronds et permet de les effacer', () => {
+    const onColorMarksChange = vi.fn();
+    render(
+      <MineComposer
+        mine={EMPTY_MINE}
+        onChange={vi.fn()}
+        colorMarks={[{ cell: { col: 2, row: 1 }, color: 'blue' }]}
+        onColorMarksChange={onColorMarksChange}
+      />,
+    );
+
+    expect(document.querySelectorAll('.board-color-marks circle')).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ronds' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Effacer les ronds' }));
+
+    expect(onColorMarksChange).toHaveBeenCalledWith([]);
+  });
+});
+
 describe('MineComposer — arêtes colorées des notes privées', () => {
   it('pose le côté haut avec la couleur choisie', () => {
     const { onEdgeMarksChange } = renderEdgeComposer();

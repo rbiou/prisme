@@ -1,8 +1,9 @@
 import { isGameState } from '../engine/endgame';
 import { isHex } from '../net/integrity';
-import { isSerializedMine } from '../engine/mine';
+import { isSerializedMine, isSerializedNote } from '../engine/mine';
 import { normalizeRoomCode } from '../net/roomCode';
-import type { PlayerId, GameState, SerializedMine } from '../engine/types';
+import { isRevealMarks, type RevealMarks } from '../net/protocol';
+import type { PlayerId, GameState, SerializedMine, SerializedNote } from '../engine/types';
 import type { SessionPhase } from '../net/session';
 
 const STORAGE_KEY = 'prisme:resume';
@@ -13,6 +14,8 @@ export interface StoredReveal {
   mine: SerializedMine;
   salt: string;
   receivedAt: number;
+  notes: SerializedNote | null;
+  marks: RevealMarks | null;
 }
 
 export interface StoredResume {
@@ -71,7 +74,9 @@ function isStoredResume(value: unknown): value is StoredResume {
         isPlayerId(reveal.from) &&
         isSerializedMine(reveal.mine) &&
         typeof reveal.salt === 'string' &&
-        typeof reveal.receivedAt === 'number',
+        typeof reveal.receivedAt === 'number' &&
+        (reveal.notes === undefined || reveal.notes === null || isSerializedNote(reveal.notes)) &&
+        (reveal.marks === undefined || reveal.marks === null || isRevealMarks(reveal.marks)),
     )
   ) {
     return false;

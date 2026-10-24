@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MineComposer } from '../components/MineComposer';
 import { validateMine } from '../engine/placement';
-import { deserializeMine, isSerializedMine, serializeMine } from '../engine/mine';
+import { generateRandomMine } from '../engine/randomMine';
+import { deserializeNote, isSerializedNote, serializeMine } from '../engine/mine';
 import type { Mine, PlayerId } from '../engine/types';
 import { fr } from '../i18n/fr';
 import type { Settings } from '../state/settings';
@@ -15,7 +16,7 @@ function loadDraft(): Mine {
     const raw = window.sessionStorage.getItem(DRAFT_KEY);
     if (!raw) return { version: 1, pieces: [] };
     const parsed: unknown = JSON.parse(raw);
-    return isSerializedMine(parsed) ? deserializeMine(parsed) : { version: 1, pieces: [] };
+    return isSerializedNote(parsed) ? deserializeNote(parsed) : { version: 1, pieces: [] };
   } catch {
     return { version: 1, pieces: [] };
   }
@@ -88,6 +89,23 @@ export function PlacementScreen({
     if (!result.ok) {
       setLocalError(result.error ?? 'La mine n’a pas pu être verrouillée.');
     }
+  }
+
+  function randomize() {
+    if (busy || locked) return;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const generated = generateRandomMine({
+        enforceWhiteSymmetry: settings.enforceWhiteSymmetry,
+      });
+      if (generated) {
+        setMine(generated);
+        setLocalError(null);
+        return;
+      }
+    }
+    setLocalError(
+      'Impossible de tirer une mine valide pour le moment. Réessayez ou placez les gemmes à la main.',
+    );
   }
 
   return (
@@ -171,6 +189,15 @@ export function PlacementScreen({
             <section className="card card--plain lock-card">
               <h2>{fr.placement.lock}</h2>
               <p>{fr.placement.lockedNote}</p>
+              <button
+                type="button"
+                className="btn btn--secondary btn--wide"
+                onClick={randomize}
+                disabled={busy}
+              >
+                {fr.placement.randomize}
+              </button>
+              <p className="fine-print">{fr.placement.randomizeHint}</p>
               <button
                 type="button"
                 className="btn btn--primary btn--wide"

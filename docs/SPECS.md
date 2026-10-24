@@ -75,19 +75,25 @@ puis les échanges passent directement entre les deux navigateurs.
 ### 5.4 Placement des mines
 
 Chaque joueur compose sa mine sur le plateau **Ma mine**. Le panneau de
-validation indique en temps réel les contraintes restantes. Une fois la mine
-valide, **Verrouiller ma mine** calcule l'engagement SHA-256 et l'envoie à
-l'adversaire. L'écran d'attente affiche le nom de l'adversaire jusqu'au
-démarrage.
+validation indique en temps réel les contraintes restantes. Le bouton **Placer
+au hasard** tire une mine complète et valide, que l'on peut encore ajuster. Une
+fois la mine valide, **Verrouiller ma mine** calcule l'engagement SHA-256 et
+l'envoie à l'adversaire. L'écran d'attente affiche le nom de l'adversaire
+jusqu'au démarrage.
 
 ### 5.5 Partie
 
 Deux onglets principaux :
 
-- **Prospection** : plateau adverse, notes privées, journal des réponses,
-  contrôles de scan, bouton de proposition.
+- **Prospection** : un seul plateau de notes privées qui sert aussi à sonder,
+  journal des réponses, contrôles de scan, bouton de proposition.
 - **Ma mine** : mine secrète verrouillée, visualisation, et fenêtre de
   confirmation lorsqu'une question de l'adversaire arrive.
+
+L'outil **Sonder** est l'état neutre : une case touchée est interrogée et une
+étiquette de bord tire un rayon. Les outils **Gemmes**, **Croix**, **Arêtes** et
+**Ronds** transforment le toucher d'une case en action de note. Il faut revenir à
+**Sonder** pour soumettre une proposition.
 
 Bandeau de tour permanent : « À vous de prospecter », « Au tour de
 l'adversaire », « Réponse en attente de confirmation », « Dernier tour ».
@@ -132,10 +138,16 @@ plateau de prospection, pour éviter de rejouer un rayon déjà connu. Le pannea
   rayon. Une arête partagée par deux cases n'est enregistrée qu'une fois ; la
   toucher à nouveau avec la même couleur la retire, avec une autre couleur la
   recolore. Ces notes restent locales.
+- Un outil **Ronds** place un rond de couleur sur une case : on sait qu'une
+  gemme de cette couleur s'y trouve, sans connaître sa forme. Un seul rond par
+  case ; le toucher à nouveau avec la même couleur le retire.
+- La saisie par coordonnées d'ancrage n'est pas proposée dans les notes ; le
+  plateau se manipule directement.
 - **Simuler un rayon** : choisir une entrée, voir la trajectoire et le résultat
   calculés sur les notes. Comparer avec les réponses enregistrées ; les
   incohérences sont signalées.
-- Les notes ne sont jamais transmises.
+- Les notes ne sont jamais transmises pendant la partie ; seules les notes
+  finales sont partagées à la fin pour expliquer le raisonnement.
 
 #### Proposition
 
@@ -172,6 +184,9 @@ plateau de prospection, pour éviter de rejouer un rayon déjà connu. Le pannea
 
 - Écran de résultat : victoire, défaite ou égalité, avec la raison.
 - Révélation des deux mines côte à côte (empilées sur mobile).
+- Section **Notes finales et propositions** : les notes de chaque joueur avec
+  leurs croix, arêtes et ronds, puis, en dépliant, la proposition soumise et son
+  verdict.
 - Vérification de l'engagement SHA-256 et, sur demande, rejeu des réponses.
 - Boutons **Rejouer** (si la connexion est encore active) et **Accueil**.
 - En cas de doute sur l'intégrité, un avertissement explicite est affiché.
@@ -190,7 +205,7 @@ plateau de prospection, pour éviter de rejouer un rayon déjà connu. Le pannea
 | F08 | Tirer un rayon, calculer localement la réponse, la faire confirmer, envoyer seulement le résultat. |
 | F09 | Scanner une case avec une règle déterministe.                                                      |
 | F10 | Tenir un journal public des scans et confirmations.                                                |
-| F11 | Permettre des notes privées avec pièces candidates et simulation.                                  |
+| F11 | Permettre des notes privées avec pièces, croix, arêtes, ronds et simulation.                       |
 | F12 | Soumettre une mine candidate et appliquer la machine à états de fin de partie.                     |
 | F13 | Révéler les mines et vérifier l'engagement à la fin.                                               |
 | F14 | Installer la PWA, cacher l'interface, proposer les mises à jour.                                   |
@@ -198,6 +213,8 @@ plateau de prospection, pour éviter de rejouer un rayon déjà connu. Le pannea
 | F16 | Afficher des messages clairs en cas d'échec de connexion (NAT, STUN, courtier indisponible).       |
 | F17 | Reprendre automatiquement une partie après une coupure, ou manuellement via le code.               |
 | F18 | Griser les entrées déjà demandées et afficher la table des mélanges de couleurs en partie.         |
+| F19 | Proposer un placement aléatoire valide pour la mine secrète.                                       |
+| F20 | Partager les notes finales et les propositions à la fin de la partie.                              |
 
 ## 7. Exigences non fonctionnelles
 

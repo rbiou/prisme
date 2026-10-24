@@ -122,7 +122,8 @@ Règles d'architecture :
   (sortie, rebond, boucle), validation du placement (chevauchement, contact,
   hors plateau, gemme cachée), scan de case, machine à états de fin de partie,
   sérialisation, code de salon, protocole, machine de session, reprise après
-  coupure et validation des arêtes de notes.
+  coupure, arêtes et ronds de notes, notes finales et génération aléatoire d'une
+  mine valide.
 - Les tests doivent être déterministes ; pas de dépendance à l'ordre des objets
   ou au hasard non contrôlé.
 - Un bug corrigé doit être accompagné d'un test de régression.

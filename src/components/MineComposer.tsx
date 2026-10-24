@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { parseCellLabel } from '../engine/board';
+import { cellLabel, parseCellLabel } from '../engine/board';
+import { colorMarkAt, upsertColorMark, type ColorMark } from '../engine/colorMarks';
 import { GEM_COLORS, GEM_COLOR_LABELS } from '../engine/colors';
 import { upsertNoteEdge, type CellEdgeSide, type NoteEdgeMark } from '../engine/noteEdges';
 import {
@@ -64,6 +65,8 @@ export function GemPreview({
   );
 }
 
+export type NoteTool = 'scan' | 'piece' | 'cross' | 'edge' | 'dot';
+
 export interface MineComposerProps {
   mine: Mine;
   onChange: (mine: Mine) => void;
@@ -79,6 +82,18 @@ export interface MineComposerProps {
   /** Arêtes de gemmes notées avec une couleur, sans révéler la mine réelle. */
   edgeMarks?: NoteEdgeMark[];
   onEdgeMarksChange?: (marks: NoteEdgeMark[]) => void;
+  /** Ronds de couleur : gemme de couleur connue, forme inconnue. */
+  colorMarks?: ColorMark[];
+  onColorMarksChange?: (marks: ColorMark[]) => void;
+  /** Outil courant, contrôlé par l’écran de partie. */
+  tool?: NoteTool;
+  onToolChange?: (tool: NoteTool) => void;
+  /** Sonder une case ou un rayon directement depuis le plateau de notes. */
+  scanEnabled?: boolean;
+  onScanCell?: (cell: Cell) => void;
+  onScanEntry?: (label: string) => void;
+  askedEntries?: ReadonlySet<string> | null;
+  showCoordinateInput?: boolean;
 }
 
 export function MineComposer({
@@ -94,22 +109,40 @@ export function MineComposer({
   onCrossesChange,
   edgeMarks = [],
   onEdgeMarksChange,
+  colorMarks = [],
+  onColorMarksChange,
+  tool: controlledTool,
+  onToolChange,
+  scanEnabled = false,
+  onScanCell,
+  onScanEntry,
+  askedEntries = null,
+  showCoordinateInput = true,
 }: MineComposerProps) {
   const [internalKind, setInternalKind] = useState<PieceKind>('red-parallelogram');
   const [rotation, setRotation] = useState<Rotation>(0);
   const [message, setMessage] = useState<string | null>(null);
   const [coordinate, setCoordinate] = useState('');
-  const [tool, setTool] = useState<'piece' | 'cross' | 'edge'>('piece');
+  const [internalTool, setInternalTool] = useState<NoteTool>(onScanCell ? 'scan' : 'piece');
   const [edgeSide, setEdgeSide] = useState<CellEdgeSide>('top');
-  const [edgeColor, setEdgeColor] = useState<GemColor>('red');
+  const [markColor, setMarkColor] = useState<GemColor>('red');
+
+  const tool = controlledTool ?? internalTool;
+  function changeTool(next: NoteTool) {
+    setInternalTool(next);
+    onToolChange?.(next);
+  }
 
   const activeKind = selectedKind ?? internalKind;
   const placed = mine.pieces.find((piece) => piece.kind === activeKind);
+  const scanMode = tool === 'scan';
   const crossMode = Boolean(onCrossesChange) && tool === 'cross';
   const edgeMode = Boolean(onEdgeMarksChange) && tool === 'edge';
+  const dotMode = Boolean(onColorMarksChange) && tool === 'dot';
 
   function selectKind(kind: PieceKind) {
     if (disabled) return;
+    changeTool('piece');
     setInternalKind(kind);
     onSelectedKindChange?.(kind);
     const existing = mine.pieces.find((piece) => piece.kind === kind);
@@ -126,9 +159,14 @@ export function MineComposer({
       return;
     }
     onChange(upsertPiece(mine, candidate));
-    // La case n’est plus vide : une croix éventuelle n’a plus de sens.
+    // La case n’est plus vide : une croix ou un rond éventuel n’a plus de sens.
     if (onCrossesChange && crosses.some((item) => item.col === cell.col && item.row === cell.row)) {
       onCrossesChange(crosses.filter((item) => !(item.col === cell.col && item.row === cell.row)));
+    }
+    if (onColorMarksChange && colorMarkAt(colorMarks, cell)) {
+      onColorMarksChange(
+        colorMarks.filter((mark) => !(mark.cell.col === cell.col && mark.cell.row === cell.row)),
+      );
     }
     setMessage(null);
   }
@@ -136,11 +174,16 @@ export function MineComposer({
   function toggleCross(cell: Cell) {
     if (disabled || !onCrossesChange) return;
     const exists = crosses.some((item) => item.col === cell.col && item.row === cell.row);
-    onCrossesChange(
-      exists
-        ? crosses.filter((item) => !(item.col === cell.col && item.row === cell.row))
-        : [...crosses, cell],
-    );
+    if (exists) {
+      onCrossesChange(crosses.filter((item) => !(item.col === cell.col && item.row === cell.row)));
+    } else {
+      onCrossesChange([...crosses, cell]);
+      if (onColorMarksChange && colorMarkAt(colorMarks, cell)) {
+        onColorMarksChange(
+          colorMarks.filter((mark) => !(mark.cell.col === cell.col && mark.cell.row === cell.row)),
+        );
+      }
+    }
     setMessage(null);
   }
 
@@ -159,7 +202,7 @@ export function MineComposer({
             ),
         )
       : edgeMarks;
-    onEdgeMarksChange(upsertNoteEdge(base, cell, edgeSide, edgeColor));
+    onEdgeMarksChange(upsertNoteEdge(base, cell, edgeSide, markColor));
     if (isDiagonal && onCrossesChange) {
       const remaining = crosses.filter((item) => !(item.col === cell.col && item.row === cell.row));
       if (remaining.length !== crosses.length) onCrossesChange(remaining);
@@ -167,13 +210,32 @@ export function MineComposer({
     setMessage(null);
   }
 
+  function placeDot(cell: Cell) {
+    if (disabled || !onColorMarksChange) return;
+    const existing = colorMarkAt(colorMarks, cell);
+    onColorMarksChange(upsertColorMark(colorMarks, cell, markColor));
+    if (existing?.color !== markColor && onCrossesChange) {
+      const remaining = crosses.filter((item) => !(item.col === cell.col && item.row === cell.row));
+      if (remaining.length !== crosses.length) onCrossesChange(remaining);
+    }
+    setMessage(null);
+  }
+
   function handleCell(cell: Cell) {
+    if (scanMode) {
+      if (scanEnabled) onScanCell?.(cell);
+      return;
+    }
     if (crossMode) {
       toggleCross(cell);
       return;
     }
     if (edgeMode) {
       placeEdge(cell);
+      return;
+    }
+    if (dotMode) {
+      placeDot(cell);
       return;
     }
     placeAt(cell);
@@ -199,6 +261,7 @@ export function MineComposer({
     onChange({ version: 1, pieces: [] });
     onCrossesChange?.([]);
     onEdgeMarksChange?.([]);
+    onColorMarksChange?.([]);
     setRotation(0);
     setMessage(null);
   }
@@ -268,7 +331,10 @@ export function MineComposer({
             onClick={clear}
             disabled={
               disabled ||
-              (mine.pieces.length === 0 && crosses.length === 0 && edgeMarks.length === 0)
+              (mine.pieces.length === 0 &&
+                crosses.length === 0 &&
+                edgeMarks.length === 0 &&
+                colorMarks.length === 0)
             }
           >
             {fr.placement.clear}
@@ -276,14 +342,25 @@ export function MineComposer({
         </div>
       </div>
 
-      {onCrossesChange || onEdgeMarksChange ? (
+      {onScanCell || onCrossesChange || onEdgeMarksChange || onColorMarksChange ? (
         <div className="composer-tools">
           <div className="mode-switch" role="group" aria-label={fr.placement.notesTool}>
+            {onScanCell ? (
+              <button
+                type="button"
+                className={`mode-button${tool === 'scan' ? ' is-active' : ''}`}
+                aria-pressed={tool === 'scan'}
+                onClick={() => changeTool('scan')}
+                disabled={disabled}
+              >
+                {fr.placement.scanTool}
+              </button>
+            ) : null}
             <button
               type="button"
               className={`mode-button${tool === 'piece' ? ' is-active' : ''}`}
               aria-pressed={tool === 'piece'}
-              onClick={() => setTool('piece')}
+              onClick={() => changeTool('piece')}
               disabled={disabled}
             >
               {fr.placement.pieceTool}
@@ -293,7 +370,7 @@ export function MineComposer({
                 type="button"
                 className={`mode-button${tool === 'cross' ? ' is-active' : ''}`}
                 aria-pressed={tool === 'cross'}
-                onClick={() => setTool('cross')}
+                onClick={() => changeTool('cross')}
                 disabled={disabled}
               >
                 {fr.placement.crossTool}
@@ -304,10 +381,21 @@ export function MineComposer({
                 type="button"
                 className={`mode-button${tool === 'edge' ? ' is-active' : ''}`}
                 aria-pressed={tool === 'edge'}
-                onClick={() => setTool('edge')}
+                onClick={() => changeTool('edge')}
                 disabled={disabled}
               >
                 {fr.placement.edgeTool}
+              </button>
+            ) : null}
+            {onColorMarksChange ? (
+              <button
+                type="button"
+                className={`mode-button${tool === 'dot' ? ' is-active' : ''}`}
+                aria-pressed={tool === 'dot'}
+                onClick={() => changeTool('dot')}
+                disabled={disabled}
+              >
+                {fr.placement.dotTool}
               </button>
             ) : null}
           </div>
@@ -331,30 +419,42 @@ export function MineComposer({
               {fr.placement.clearEdges}
             </button>
           ) : null}
+          {tool === 'dot' && colorMarks.length > 0 ? (
+            <button
+              type="button"
+              className="btn btn--ghost btn--small"
+              onClick={() => onColorMarksChange?.([])}
+              disabled={disabled}
+            >
+              {fr.placement.clearDots}
+            </button>
+          ) : null}
         </div>
       ) : null}
 
-      {edgeMode ? (
+      {edgeMode || dotMode ? (
         <div className="edge-tools">
-          <div className="edge-group">
-            <span className="edge-group-label">{fr.placement.edgeSide}</span>
-            <div className="edge-options" role="group" aria-label={fr.placement.edgeSide}>
-              {EDGE_SIDE_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={`mode-button${edgeSide === option.value ? ' is-active' : ''}`}
-                  aria-pressed={edgeSide === option.value}
-                  aria-label={option.name}
-                  title={option.name}
-                  onClick={() => setEdgeSide(option.value)}
-                  disabled={disabled}
-                >
-                  {option.label}
-                </button>
-              ))}
+          {edgeMode ? (
+            <div className="edge-group">
+              <span className="edge-group-label">{fr.placement.edgeSide}</span>
+              <div className="edge-options" role="group" aria-label={fr.placement.edgeSide}>
+                {EDGE_SIDE_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`mode-button${edgeSide === option.value ? ' is-active' : ''}`}
+                    aria-pressed={edgeSide === option.value}
+                    aria-label={option.name}
+                    title={option.name}
+                    onClick={() => setEdgeSide(option.value)}
+                    disabled={disabled}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : null}
           <div className="edge-group">
             <span className="edge-group-label">{fr.placement.edgeColor}</span>
             <div className="edge-options" role="group" aria-label={fr.placement.edgeColor}>
@@ -362,9 +462,9 @@ export function MineComposer({
                 <button
                   key={color}
                   type="button"
-                  className={`edge-color${edgeColor === color ? ' is-active' : ''}`}
-                  aria-pressed={edgeColor === color}
-                  onClick={() => setEdgeColor(color)}
+                  className={`edge-color${markColor === color ? ' is-active' : ''}`}
+                  aria-pressed={markColor === color}
+                  onClick={() => setMarkColor(color)}
                   disabled={disabled}
                 >
                   <span
@@ -385,6 +485,10 @@ export function MineComposer({
           mine={mine}
           crosses={crosses}
           edgeMarks={edgeMarks}
+          colorMarks={colorMarks}
+          askedEntries={askedEntries}
+          interactiveEntries={Boolean(scanEnabled && onScanEntry)}
+          onEntryAction={scanEnabled ? onScanEntry : undefined}
           onCellAction={disabled ? undefined : handleCell}
           interactiveCells={!disabled}
           ariaLabel={boardAriaLabel ?? fr.placement.board}
@@ -393,46 +497,61 @@ export function MineComposer({
         />
       </div>
 
-      <div className="coordinate-row">
-        <label className="field field--inline">
-          <span>{fr.placement.coordinateLabel}</span>
-          <input
-            type="text"
-            value={coordinate}
-            onChange={(event) => setCoordinate(event.target.value)}
-            placeholder={fr.placement.coordinatePlaceholder}
-            autoComplete="off"
-            autoCapitalize="characters"
-            inputMode="text"
+      {showCoordinateInput ? (
+        <div className="coordinate-row">
+          <label className="field field--inline">
+            <span>{fr.placement.coordinateLabel}</span>
+            <input
+              type="text"
+              value={coordinate}
+              onChange={(event) => setCoordinate(event.target.value)}
+              placeholder={fr.placement.coordinatePlaceholder}
+              autoComplete="off"
+              autoCapitalize="characters"
+              inputMode="text"
+              disabled={disabled}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  placeFromCoordinate();
+                }
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={placeFromCoordinate}
             disabled={disabled}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                placeFromCoordinate();
-              }
-            }}
-          />
-        </label>
-        <button
-          type="button"
-          className="btn btn--ghost"
-          onClick={placeFromCoordinate}
-          disabled={disabled}
-        >
-          {fr.placement.placeAt}
-        </button>
-      </div>
+          >
+            {fr.placement.placeAt}
+          </button>
+        </div>
+      ) : null}
 
       <p className="hint">
-        {edgeMode
-          ? fr.placement.edgeHint
-          : crossMode
-            ? fr.placement.crossHint
-            : fr.placement.placeHint}
+        {scanMode
+          ? fr.placement.scanHint
+          : dotMode
+            ? fr.placement.dotHint
+            : edgeMode
+              ? fr.placement.edgeHint
+              : crossMode
+                ? fr.placement.crossHint
+                : fr.placement.placeHint}
       </p>
       {message ? (
         <p className="inline-alert" role="status">
           {message}
+        </p>
+      ) : null}
+      {colorMarks.length > 0 ? (
+        <p className="visually-hidden">
+          Ronds de couleur :{' '}
+          {colorMarks
+            .map((mark) => `${GEM_COLOR_LABELS[mark.color]} en ${cellLabel(mark.cell)}`)
+            .join(' ; ')}
+          .
         </p>
       ) : null}
       <p className="visually-hidden">

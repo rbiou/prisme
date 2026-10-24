@@ -9,3 +9,5 @@ export * from './cellScan';
 export * from './mine';
 export * from './endgame';
 export * from './noteEdges';
+export * from './colorMarks';
+export { generateRandomMine } from './randomMine';

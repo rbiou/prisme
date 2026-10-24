@@ -12,8 +12,15 @@ import {
   type ScanAnswer,
   type ScanRequest,
 } from '../engine/endgame';
-import type { Cell, GameState, PlayerId, ScanRecord, SerializedMine } from '../engine/types';
-import type { NetworkMessage } from '../net/protocol';
+import type {
+  Cell,
+  GameState,
+  PlayerId,
+  ScanRecord,
+  SerializedMine,
+  SerializedNote,
+} from '../engine/types';
+import type { NetworkMessage, RevealMarks } from '../net/protocol';
 import { PROTOCOL_VERSION } from '../net/protocol';
 import type { LobbyContext, ReadyContext, SessionPhase } from '../net/session';
 import type { PeerStatus } from '../net/peer';
@@ -28,6 +35,8 @@ export interface RevealRecord {
   mine: SerializedMine;
   salt: string;
   receivedAt: number;
+  notes: SerializedNote | null;
+  marks: RevealMarks | null;
 }
 
 /** Notification éphémère affichée en surimpression de l’écran de partie. */
@@ -312,12 +321,25 @@ function handleMessage(state: MatchState, message: NetworkMessage, now: number):
         const same =
           JSON.stringify(existing.mine) === JSON.stringify(message.mine) &&
           existing.salt === message.salt;
-        return same
-          ? state
-          : {
-              ...state,
-              warning: 'Une seconde révélation différente a été ignorée.',
-            };
+        if (same) {
+          if ((existing.notes || !message.notes) && (existing.marks || !message.marks))
+            return state;
+          return {
+            ...state,
+            reveals: {
+              ...state.reveals,
+              [message.from]: {
+                ...existing,
+                notes: existing.notes ?? message.notes ?? null,
+                marks: existing.marks ?? message.marks ?? null,
+              },
+            },
+          };
+        }
+        return {
+          ...state,
+          warning: 'Une seconde révélation différente a été ignorée.',
+        };
       }
       return {
         ...state,
@@ -327,6 +349,8 @@ function handleMessage(state: MatchState, message: NetworkMessage, now: number):
             mine: message.mine,
             salt: message.salt,
             receivedAt: now,
+            notes: message.notes ?? null,
+            marks: message.marks ?? null,
           },
         },
       };

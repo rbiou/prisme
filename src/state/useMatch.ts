@@ -1,16 +1,26 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import { entryForLabel } from '../engine/board';
+import { entryForLabel, isCell } from '../engine/board';
 import { scanCell } from '../engine/cellScan';
+import { isColorMark } from '../engine/colorMarks';
 import { canScan, canSubmit, otherPlayer, type ScanAnswer } from '../engine/endgame';
-import { checkSolution, deserializeMine, serializeMine } from '../engine/mine';
+import { checkSolution, deserializeMine, isSerializedNote, serializeMine } from '../engine/mine';
+import { isNoteEdgeMark } from '../engine/noteEdges';
 import { simulateRay } from '../engine/ray';
 import { validateMine } from '../engine/placement';
-import type { Cell, GameState, Mine, PlayerId, SerializedMine } from '../engine/types';
+import type {
+  Cell,
+  GameState,
+  Mine,
+  PlayerId,
+  SerializedMine,
+  SerializedNote,
+} from '../engine/types';
 import { createCommitment, randomHex } from '../net/integrity';
 import {
   newMessageId,
   PROTOCOL_VERSION,
   type NetworkMessage,
+  type RevealMarks,
   type SyncMessage,
 } from '../net/protocol';
 import { normalizeRoomCode } from '../net/roomCode';
@@ -76,6 +86,43 @@ function publicRound(game: GameState | null): number {
 
 function hasPendingAction(game: GameState | null): boolean {
   return Boolean(game?.pendingScan || game?.pendingConfirmation || game?.pendingSubmission);
+}
+
+function readJsonArray(key: string): unknown[] {
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Croix, arêtes et ronds restent privés jusqu’à la révélation finale. */
+function readMarksForReveal(readyAt: number | null): RevealMarks | null {
+  if (readyAt === null) return null;
+  const crosses = readJsonArray(`prisme:crosses:${readyAt}`).filter(
+    (value): value is Cell =>
+      typeof value === 'object' && value !== null && isCell(value as { col: number; row: number }),
+  );
+  const edges = readJsonArray(`prisme:edges:${readyAt}`).filter(isNoteEdgeMark);
+  const colors = readJsonArray(`prisme:dots:${readyAt}`).filter(isColorMark);
+  if (crosses.length === 0 && edges.length === 0 && colors.length === 0) return null;
+  return { crosses, edges, colors };
+}
+
+/** Les notes finales sont conservées localement par l’écran de partie. */
+function readNotesForReveal(readyAt: number | null): SerializedNote | null {
+  if (readyAt === null) return null;
+  try {
+    const raw = window.sessionStorage.getItem(`prisme:notes:${readyAt}`);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return isSerializedNote(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 function scanSignature(scan: GameState['scans'][number]): string {
@@ -162,6 +209,8 @@ function snapshotFromState(
               mine: reveal.mine,
               salt: reveal.salt,
               receivedAt: reveal.receivedAt,
+              notes: reveal.notes,
+              marks: reveal.marks,
             },
           ]
         : [],
@@ -216,13 +265,25 @@ export function useMatch(settings: Settings): UseMatchResult {
     if (!session) return;
     const current = stateRef.current;
     const reveals = Object.entries(current.reveals).flatMap(([from, reveal]) =>
-      reveal ? [{ from: from as PlayerId, mine: reveal.mine, salt: reveal.salt }] : [],
+      reveal
+        ? [
+            {
+              from: from as PlayerId,
+              mine: reveal.mine,
+              salt: reveal.salt,
+              notes: reveal.notes,
+              marks: reveal.marks,
+            },
+          ]
+        : [],
     );
     if (current.role && current.locked && current.game?.phase === 'ended') {
       reveals.push({
         from: current.role,
         mine: serializeMine(current.locked.mine),
         salt: current.locked.salt,
+        notes: readNotesForReveal(current.readyAt),
+        marks: readMarksForReveal(current.readyAt),
       });
     }
     session.sendSync({
@@ -300,6 +361,8 @@ export function useMatch(settings: Settings): UseMatchResult {
                 mine: reveal.mine,
                 salt: reveal.salt,
                 receivedAt: Date.now(),
+                notes: reveal.notes ?? null,
+                marks: reveal.marks ?? null,
               };
             }
             const shouldAdopt =
@@ -415,6 +478,8 @@ export function useMatch(settings: Settings): UseMatchResult {
         mine: reveal.mine,
         salt: reveal.salt,
         receivedAt: reveal.receivedAt,
+        notes: reveal.notes ?? null,
+        marks: reveal.marks ?? null,
       };
     }
     const data: ResumeData = {
@@ -865,6 +930,8 @@ export function useMatch(settings: Settings): UseMatchResult {
         from: role,
         mine: serializeMine(locked.mine),
         salt: locked.salt,
+        notes: readNotesForReveal(state.readyAt),
+        marks: readMarksForReveal(state.readyAt),
       };
       if (session.send(message)) {
         revealSentRef.current = true;
@@ -877,7 +944,7 @@ export function useMatch(settings: Settings): UseMatchResult {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [state.game?.phase, state.locked, state.role]);
+  }, [state.game?.phase, state.locked, state.readyAt, state.role]);
 
   // Sauvegarde locale pour reprendre après une fermeture de l’application.
   useEffect(() => {

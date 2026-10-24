@@ -51,6 +51,12 @@ export interface SerializedMine {
   pieces: SerializedPiece[];
 }
 
+/** Notes privées : de zéro à cinq pièces candidates, sans obligation de complétude. */
+export interface SerializedNote {
+  version: 1;
+  pieces: SerializedPiece[];
+}
+
 export type RayColor =
   | 'transparent'
   | 'white'

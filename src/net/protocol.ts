@@ -1,7 +1,9 @@
 import { isCell, isValidEntryLabel } from '../engine/board';
+import { isColorMark, type ColorMark } from '../engine/colorMarks';
 import { isGemColor, isRayColor } from '../engine/colors';
 import { isGameState } from '../engine/endgame';
-import { isSerializedMine } from '../engine/mine';
+import { isSerializedMine, isSerializedNote } from '../engine/mine';
+import { isNoteEdgeMark, type NoteEdgeMark } from '../engine/noteEdges';
 import type {
   Cell,
   GemColor,
@@ -9,6 +11,7 @@ import type {
   PlayerId,
   RayColor,
   SerializedMine,
+  SerializedNote,
 } from '../engine/types';
 import { isHex, randomHex } from './integrity';
 
@@ -54,6 +57,8 @@ export interface SyncReveal {
   from: PlayerId;
   mine: SerializedMine;
   salt: string;
+  notes: SerializedNote | null;
+  marks: RevealMarks | null;
 }
 
 /** Échange d’état public après une reconnexion ou une reprise de partie. */
@@ -157,12 +162,21 @@ export interface SubmitResultMessage extends MessageBase {
   correct: boolean;
 }
 
+export interface RevealMarks {
+  crosses: Cell[];
+  edges: NoteEdgeMark[];
+  colors: ColorMark[];
+}
+
 export interface RevealMessage extends MessageBase {
   type: 'reveal';
   id: string;
   from: PlayerId;
   mine: SerializedMine;
   salt: string;
+  /** Notes finales, partagées uniquement à la fin pour expliquer le raisonnement. */
+  notes?: SerializedNote | null;
+  marks?: RevealMarks | null;
 }
 
 export interface PingMessage extends MessageBase {
@@ -219,6 +233,21 @@ function isCellValue(value: unknown): value is Cell {
 function isAnswerColor(kind: 'wave' | 'cell', value: unknown): boolean {
   if (kind === 'wave') return typeof value === 'string' && isRayColor(value);
   return value === null || (typeof value === 'string' && isGemColor(value));
+}
+
+export function isRevealMarks(value: unknown): value is RevealMarks {
+  if (!isRecord(value)) return false;
+  return (
+    Array.isArray(value.crosses) &&
+    value.crosses.length <= 80 &&
+    value.crosses.every((cell) => isCellValue(cell)) &&
+    Array.isArray(value.edges) &&
+    value.edges.length <= 480 &&
+    value.edges.every((edge) => isNoteEdgeMark(edge)) &&
+    Array.isArray(value.colors) &&
+    value.colors.length <= 80 &&
+    value.colors.every((mark) => isColorMark(mark))
+  );
 }
 
 export function isNetworkMessage(value: unknown): value is NetworkMessage {
@@ -286,7 +315,11 @@ export function isNetworkMessage(value: unknown): value is NetworkMessage {
             isPlayerId(reveal.from) &&
             isSerializedMine(reveal.mine) &&
             typeof reveal.salt === 'string' &&
-            isHex(reveal.salt, 32),
+            isHex(reveal.salt, 32) &&
+            (reveal.notes === undefined ||
+              reveal.notes === null ||
+              isSerializedNote(reveal.notes)) &&
+            (reveal.marks === undefined || reveal.marks === null || isRevealMarks(reveal.marks)),
         )
       );
     case 'scan':
@@ -345,7 +378,9 @@ export function isNetworkMessage(value: unknown): value is NetworkMessage {
         isPlayerId(value.from) &&
         isSerializedMine(value.mine) &&
         typeof value.salt === 'string' &&
-        isHex(value.salt, 32)
+        isHex(value.salt, 32) &&
+        (value.notes === undefined || value.notes === null || isSerializedNote(value.notes)) &&
+        (value.marks === undefined || value.marks === null || isRevealMarks(value.marks))
       );
     case 'ping':
       return isMessageId(value.id) && isPlayerId(value.from);

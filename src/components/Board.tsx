@@ -9,6 +9,7 @@ import {
   entryForLabel,
   sideLabel,
 } from '../engine/board';
+import type { ColorMark } from '../engine/colorMarks';
 import { RAY_COLOR_SWATCHES } from '../engine/colors';
 import { edgeSegment, type NoteEdgeMark } from '../engine/noteEdges';
 import { labelForKind, piecePolygon } from '../engine/pieces';
@@ -26,6 +27,7 @@ export interface BoardProps {
   notes?: Mine;
   crosses?: Cell[] | null;
   edgeMarks?: NoteEdgeMark[] | null;
+  colorMarks?: ColorMark[] | null;
   /** Étiquettes de bord déjà utilisées dans le journal public. */
   askedEntries?: ReadonlySet<string> | null;
   onCellAction?: (cell: Cell) => void;
@@ -91,6 +93,7 @@ export function Board({
   notes,
   crosses = null,
   edgeMarks = null,
+  colorMarks = null,
   askedEntries = null,
   onCellAction,
   onEntryAction,
@@ -228,6 +231,20 @@ export function Board({
               </g>
             );
           })}
+        </g>
+      ) : null}
+
+      {colorMarks && colorMarks.length > 0 ? (
+        <g className="board-color-marks" aria-hidden="true">
+          {colorMarks.map((mark) => (
+            <circle
+              key={`color-${mark.cell.col}-${mark.cell.row}`}
+              cx={mark.cell.col + 0.5}
+              cy={mark.cell.row + 0.5}
+              r="0.22"
+              fill={RAY_COLOR_SWATCHES[mark.color]}
+            />
+          ))}
         </g>
       ) : null}
 

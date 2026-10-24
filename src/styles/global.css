@@ -1203,6 +1203,12 @@ input[type='checkbox'] {
   stroke-linecap: round;
 }
 
+.board-color-marks circle {
+  stroke: #04101f;
+  stroke-width: 0.045px;
+  filter: drop-shadow(0 0.03px 0.08px rgba(0, 0, 0, 0.65));
+}
+
 .board-gem polygon {
   filter: drop-shadow(0 0.05px 0.12px rgba(0, 0, 0, 0.65));
 }
@@ -2147,6 +2153,28 @@ input[type='checkbox'] {
 
 .result-mine {
   min-width: 0;
+}
+
+.result-reasoning {
+  margin-top: 22px;
+}
+
+.result-notes {
+  margin-top: 12px;
+}
+
+.result-notes h3 {
+  margin: 0;
+}
+
+.reasoning-proposal {
+  margin-top: 12px;
+}
+
+.reasoning-proposal summary {
+  color: var(--muted);
+  font-size: 0.82rem;
+  cursor: pointer;
 }
 
 .hash-line {

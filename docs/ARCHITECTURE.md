@@ -63,6 +63,8 @@ entre les deux navigateurs.
 │   │   ├── mine.ts
 │   │   ├── endgame.ts
 │   │   ├── noteEdges.ts
+│   │   ├── colorMarks.ts
+│   │   ├── randomMine.ts
 │   │   └── index.ts
 │   ├── net/
 │   │   ├── roomCode.ts
@@ -275,10 +277,13 @@ du canal de données sont la source des actions distantes.
 ### 6.2 État privé local
 
 - `localMine` : mine secrète verrouillée, sel, engagement.
-- `notes` : pièces candidates, croix sur les cases vides et arêtes colorées
-  (côtés ou diagonales), conservées dans `sessionStorage` et jamais transmises.
-  Les arêtes sont stockées sous forme canonique pour qu'une arête partagée par
-  deux cases ne soit enregistrée qu'une fois.
+- `notes` : pièces candidates, croix sur les cases vides, arêtes colorées
+  (côtés ou diagonales) et ronds de couleur (gemme de couleur connue, forme
+  inconnue), conservées dans `sessionStorage` et jamais transmises pendant la
+  partie. Les arêtes sont stockées sous forme canonique pour qu'une arête
+  partagée par deux cases ne soit enregistrée qu'une fois. Les notes finales
+  (pièces, croix, arêtes et ronds) accompagnent le message `reveal` à la fin de
+  la partie et servent à expliquer le raisonnement.
 - `settings` : options de règles et d'accessibilité.
 - `session` : rôle, code de salon, phase (salon, placement, attente, prête,
   reprise) et état de connexion.
@@ -383,9 +388,11 @@ l'état public et les révélations déjà reçues, jamais la mine secrète.
 
 - **Moteur** : pièces, rotations, aires, mélange, rayons, boucles, validation,
   scan de case, fin de partie, sérialisation.
-- **Réseau** : code de salon, validation des messages, calcul du premier joueur,
-  machine de session (hôte/invité) avec un faux pair PeerJS, échange des
-  engagements et démarrage.
+- **Réseau** : code de salon, validation des messages (dont `sync` et les notes
+  finales), calcul du premier joueur, machine de session (hôte/invité) avec un
+  faux pair PeerJS, engagement, démarrage, coupure et reprise.
+- **Notes et génération** : arêtes canoniques, ronds de couleur, placement
+  aléatoire valide, sérialisation des notes incomplètes.
 - **Interface** : smoke tests des écrans, placement d'une pièce, affichage des
   erreurs, dialogue de confirmation.
 - **Build** : `npm run build` doit produire un `dist/` sans erreur et avec des
