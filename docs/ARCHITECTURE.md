@@ -62,6 +62,7 @@ entre les deux navigateurs.
 │   │   ├── cellScan.ts
 │   │   ├── mine.ts
 │   │   ├── endgame.ts
+│   │   ├── noteEdges.ts
 │   │   └── index.ts
 │   ├── net/
 │   │   ├── roomCode.ts
@@ -272,8 +273,10 @@ du canal de données sont la source des actions distantes.
 ### 6.2 État privé local
 
 - `localMine` : mine secrète verrouillée, sel, engagement.
-- `notes` : pièces candidates et croix sur les cases vides, conservées dans
-  `sessionStorage` et jamais transmises.
+- `notes` : pièces candidates, croix sur les cases vides et arêtes colorées
+  (côtés ou diagonales), conservées dans `sessionStorage` et jamais transmises.
+  Les arêtes sont stockées sous forme canonique pour qu'une arête partagée par
+  deux cases ne soit enregistrée qu'une fois.
 - `settings` : options de règles et d'accessibilité.
 - `session` : rôle, code de salon, phase (salon, placement, attente, prête) et
   état de connexion.

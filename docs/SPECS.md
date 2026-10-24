@@ -119,6 +119,12 @@ secondes. Elle rappelle la question et le résultat reçu sans interrompre le je
   lorsqu'elles forment une mine valide.
 - Un outil **Croix** permet de marquer les cases dont on sait qu'elles sont
   vides. Ces marques restent locales et peuvent être effacées séparément.
+- Un outil **Arêtes** permet de noter les bords de gemmes déjà déduits : un des
+  quatre côtés d'une case ou l'une des deux diagonales, avec la couleur de la
+  gemme concernée. C'est utile pour mémoriser l'arête qui a fait rebondir un
+  rayon. Une arête partagée par deux cases n'est enregistrée qu'une fois ; la
+  toucher à nouveau avec la même couleur la retire, avec une autre couleur la
+  recolore. Ces notes restent locales.
 - **Simuler un rayon** : choisir une entrée, voir la trajectoire et le résultat
   calculés sur les notes. Comparer avec les réponses enregistrées ; les
   incohérences sont signalées.

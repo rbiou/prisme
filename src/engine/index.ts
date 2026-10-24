@@ -8,3 +8,4 @@ export * from './placement';
 export * from './cellScan';
 export * from './mine';
 export * from './endgame';
+export * from './noteEdges';

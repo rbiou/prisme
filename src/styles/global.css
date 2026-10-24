@@ -1057,6 +1057,68 @@ input[type='checkbox'] {
   justify-content: space-between;
 }
 
+.edge-tools {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(4, 10, 20, 0.32);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.edge-group {
+  display: grid;
+  gap: 6px;
+}
+
+.edge-group-label {
+  color: var(--faint);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.edge-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.edge-color {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+  background: rgba(4, 10, 20, 0.48);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.edge-color.is-active {
+  color: var(--text);
+  background: rgba(103, 232, 249, 0.08);
+  border-color: rgba(103, 232, 249, 0.55);
+}
+
+.edge-color:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.edge-color-swatch {
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+}
+
 .board-frame {
   width: 100%;
   padding: 8px;
@@ -1127,6 +1189,17 @@ input[type='checkbox'] {
 .board-crosses line {
   stroke: rgba(148, 190, 235, 0.55);
   stroke-width: 0.06px;
+  stroke-linecap: round;
+}
+
+.board-edge-casing {
+  stroke: #04101f;
+  stroke-width: 0.17px;
+  stroke-linecap: round;
+}
+
+.board-edge-line {
+  stroke-width: 0.09px;
   stroke-linecap: round;
 }
 

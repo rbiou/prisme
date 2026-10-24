@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { parseCellLabel } from '../engine/board';
-import { GEM_COLOR_LABELS } from '../engine/colors';
+import { GEM_COLORS, GEM_COLOR_LABELS } from '../engine/colors';
+import { upsertNoteEdge, type CellEdgeSide, type NoteEdgeMark } from '../engine/noteEdges';
 import {
   BASE_PIECE_KINDS,
   PIECE_ORDER,
@@ -11,7 +12,7 @@ import {
   shapeFor,
 } from '../engine/pieces';
 import { removePiece, upsertPiece } from '../engine/mine';
-import type { Cell, Mine, PieceKind, Point, RayColor, Rotation } from '../engine/types';
+import type { Cell, GemColor, Mine, PieceKind, Point, RayColor, Rotation } from '../engine/types';
 import { Board } from './Board';
 import { fr } from '../i18n/fr';
 
@@ -21,6 +22,15 @@ const GEM_FILL: Record<string, string> = {
   blue: '#3b82f6',
   white: '#e2e8f0',
 };
+
+const EDGE_SIDE_OPTIONS: Array<{ value: CellEdgeSide; label: string; name: string }> = [
+  { value: 'top', label: fr.placement.edgeTop, name: fr.placement.edgeTop },
+  { value: 'right', label: fr.placement.edgeRight, name: fr.placement.edgeRight },
+  { value: 'bottom', label: fr.placement.edgeBottom, name: fr.placement.edgeBottom },
+  { value: 'left', label: fr.placement.edgeLeft, name: fr.placement.edgeLeft },
+  { value: 'diagonal-down', label: '↘', name: fr.placement.edgeDiagonalDown },
+  { value: 'diagonal-up', label: '↗', name: fr.placement.edgeDiagonalUp },
+];
 
 export function GemPreview({
   kind,
@@ -66,6 +76,9 @@ export interface MineComposerProps {
   /** Cases marquées comme vides dans les notes privées. */
   crosses?: Cell[];
   onCrossesChange?: (cells: Cell[]) => void;
+  /** Arêtes de gemmes notées avec une couleur, sans révéler la mine réelle. */
+  edgeMarks?: NoteEdgeMark[];
+  onEdgeMarksChange?: (marks: NoteEdgeMark[]) => void;
 }
 
 export function MineComposer({
@@ -79,16 +92,21 @@ export function MineComposer({
   pathColor = 'white',
   crosses = [],
   onCrossesChange,
+  edgeMarks = [],
+  onEdgeMarksChange,
 }: MineComposerProps) {
   const [internalKind, setInternalKind] = useState<PieceKind>('red-parallelogram');
   const [rotation, setRotation] = useState<Rotation>(0);
   const [message, setMessage] = useState<string | null>(null);
   const [coordinate, setCoordinate] = useState('');
-  const [tool, setTool] = useState<'piece' | 'cross'>('piece');
+  const [tool, setTool] = useState<'piece' | 'cross' | 'edge'>('piece');
+  const [edgeSide, setEdgeSide] = useState<CellEdgeSide>('top');
+  const [edgeColor, setEdgeColor] = useState<GemColor>('red');
 
   const activeKind = selectedKind ?? internalKind;
   const placed = mine.pieces.find((piece) => piece.kind === activeKind);
   const crossMode = Boolean(onCrossesChange) && tool === 'cross';
+  const edgeMode = Boolean(onEdgeMarksChange) && tool === 'edge';
 
   function selectKind(kind: PieceKind) {
     if (disabled) return;
@@ -126,9 +144,36 @@ export function MineComposer({
     setMessage(null);
   }
 
+  function placeEdge(cell: Cell) {
+    if (disabled || !onEdgeMarksChange) return;
+    const isDiagonal = edgeSide === 'diagonal-down' || edgeSide === 'diagonal-up';
+    // Les deux diagonales d’une même case ne peuvent pas appartenir à une gemme.
+    const base = isDiagonal
+      ? edgeMarks.filter(
+          (mark) =>
+            !(
+              (mark.kind === 'diagonal-down' || mark.kind === 'diagonal-up') &&
+              mark.col === cell.col &&
+              mark.row === cell.row &&
+              mark.kind !== edgeSide
+            ),
+        )
+      : edgeMarks;
+    onEdgeMarksChange(upsertNoteEdge(base, cell, edgeSide, edgeColor));
+    if (isDiagonal && onCrossesChange) {
+      const remaining = crosses.filter((item) => !(item.col === cell.col && item.row === cell.row));
+      if (remaining.length !== crosses.length) onCrossesChange(remaining);
+    }
+    setMessage(null);
+  }
+
   function handleCell(cell: Cell) {
     if (crossMode) {
       toggleCross(cell);
+      return;
+    }
+    if (edgeMode) {
+      placeEdge(cell);
       return;
     }
     placeAt(cell);
@@ -153,6 +198,7 @@ export function MineComposer({
     if (disabled) return;
     onChange({ version: 1, pieces: [] });
     onCrossesChange?.([]);
+    onEdgeMarksChange?.([]);
     setRotation(0);
     setMessage(null);
   }
@@ -220,14 +266,17 @@ export function MineComposer({
             type="button"
             className="btn btn--ghost btn--small"
             onClick={clear}
-            disabled={disabled || mine.pieces.length === 0}
+            disabled={
+              disabled ||
+              (mine.pieces.length === 0 && crosses.length === 0 && edgeMarks.length === 0)
+            }
           >
             {fr.placement.clear}
           </button>
         </div>
       </div>
 
-      {onCrossesChange ? (
+      {onCrossesChange || onEdgeMarksChange ? (
         <div className="composer-tools">
           <div className="mode-switch" role="group" aria-label={fr.placement.notesTool}>
             <button
@@ -239,26 +288,95 @@ export function MineComposer({
             >
               {fr.placement.pieceTool}
             </button>
-            <button
-              type="button"
-              className={`mode-button${tool === 'cross' ? ' is-active' : ''}`}
-              aria-pressed={tool === 'cross'}
-              onClick={() => setTool('cross')}
-              disabled={disabled}
-            >
-              {fr.placement.crossTool}
-            </button>
+            {onCrossesChange ? (
+              <button
+                type="button"
+                className={`mode-button${tool === 'cross' ? ' is-active' : ''}`}
+                aria-pressed={tool === 'cross'}
+                onClick={() => setTool('cross')}
+                disabled={disabled}
+              >
+                {fr.placement.crossTool}
+              </button>
+            ) : null}
+            {onEdgeMarksChange ? (
+              <button
+                type="button"
+                className={`mode-button${tool === 'edge' ? ' is-active' : ''}`}
+                aria-pressed={tool === 'edge'}
+                onClick={() => setTool('edge')}
+                disabled={disabled}
+              >
+                {fr.placement.edgeTool}
+              </button>
+            ) : null}
           </div>
-          {crosses.length > 0 ? (
+          {tool === 'cross' && crosses.length > 0 ? (
             <button
               type="button"
               className="btn btn--ghost btn--small"
-              onClick={() => onCrossesChange([])}
+              onClick={() => onCrossesChange?.([])}
               disabled={disabled}
             >
               {fr.placement.clearCrosses}
             </button>
           ) : null}
+          {tool === 'edge' && edgeMarks.length > 0 ? (
+            <button
+              type="button"
+              className="btn btn--ghost btn--small"
+              onClick={() => onEdgeMarksChange?.([])}
+              disabled={disabled}
+            >
+              {fr.placement.clearEdges}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {edgeMode ? (
+        <div className="edge-tools">
+          <div className="edge-group">
+            <span className="edge-group-label">{fr.placement.edgeSide}</span>
+            <div className="edge-options" role="group" aria-label={fr.placement.edgeSide}>
+              {EDGE_SIDE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`mode-button${edgeSide === option.value ? ' is-active' : ''}`}
+                  aria-pressed={edgeSide === option.value}
+                  aria-label={option.name}
+                  title={option.name}
+                  onClick={() => setEdgeSide(option.value)}
+                  disabled={disabled}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="edge-group">
+            <span className="edge-group-label">{fr.placement.edgeColor}</span>
+            <div className="edge-options" role="group" aria-label={fr.placement.edgeColor}>
+              {GEM_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  className={`edge-color${edgeColor === color ? ' is-active' : ''}`}
+                  aria-pressed={edgeColor === color}
+                  onClick={() => setEdgeColor(color)}
+                  disabled={disabled}
+                >
+                  <span
+                    className="edge-color-swatch"
+                    style={{ backgroundColor: GEM_FILL[color] }}
+                    aria-hidden="true"
+                  />
+                  <span>{GEM_COLOR_LABELS[color]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -266,6 +384,7 @@ export function MineComposer({
         <Board
           mine={mine}
           crosses={crosses}
+          edgeMarks={edgeMarks}
           onCellAction={disabled ? undefined : handleCell}
           interactiveCells={!disabled}
           ariaLabel={boardAriaLabel ?? fr.placement.board}
@@ -304,7 +423,13 @@ export function MineComposer({
         </button>
       </div>
 
-      <p className="hint">{crossMode ? fr.placement.crossHint : fr.placement.placeHint}</p>
+      <p className="hint">
+        {edgeMode
+          ? fr.placement.edgeHint
+          : crossMode
+            ? fr.placement.crossHint
+            : fr.placement.placeHint}
+      </p>
       {message ? (
         <p className="inline-alert" role="status">
           {message}

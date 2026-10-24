@@ -10,6 +10,7 @@ import {
   sideLabel,
 } from '../engine/board';
 import { RAY_COLOR_SWATCHES } from '../engine/colors';
+import { edgeSegment, type NoteEdgeMark } from '../engine/noteEdges';
 import { labelForKind, piecePolygon } from '../engine/pieces';
 import type { Cell, GemColor, Mine, Point, RayColor } from '../engine/types';
 
@@ -24,6 +25,7 @@ export interface BoardProps {
   mine?: Mine;
   notes?: Mine;
   crosses?: Cell[] | null;
+  edgeMarks?: NoteEdgeMark[] | null;
   onCellAction?: (cell: Cell) => void;
   onEntryAction?: (label: string) => void;
   interactiveCells?: boolean;
@@ -86,6 +88,7 @@ export function Board({
   mine,
   notes,
   crosses = null,
+  edgeMarks = null,
   onCellAction,
   onEntryAction,
   interactiveCells = false,
@@ -198,6 +201,25 @@ export function Board({
           </polygon>
         </g>
       ))}
+
+      {edgeMarks && edgeMarks.length > 0 ? (
+        <g className="board-edges" aria-hidden="true">
+          {edgeMarks.map((mark) => {
+            const segment = edgeSegment(mark);
+            const key = `edge-${mark.kind}-${mark.col}-${mark.row}`;
+            return (
+              <g key={key}>
+                <line {...segment} className="board-edge-casing" />
+                <line
+                  {...segment}
+                  stroke={RAY_COLOR_SWATCHES[mark.color]}
+                  className="board-edge-line"
+                />
+              </g>
+            );
+          })}
+        </g>
+      ) : null}
 
       {path && path.length > 1 ? (
         <g className="board-ray" aria-hidden="true">

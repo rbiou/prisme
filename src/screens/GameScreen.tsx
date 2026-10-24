@@ -7,6 +7,7 @@ import { ALL_ENTRIES, cellLabel, isCell, parseCellLabel, sideLabel } from '../en
 import { scanCell } from '../engine/cellScan';
 import { canScan, canSubmit } from '../engine/endgame';
 import { checkSolution, deserializeMine, isSerializedMine, serializeMine } from '../engine/mine';
+import { isNoteEdgeMark, type NoteEdgeMark } from '../engine/noteEdges';
 import { validateMine } from '../engine/placement';
 import { simulateRay } from '../engine/ray';
 import { RAY_COLOR_LABELS } from '../engine/colors';
@@ -68,6 +69,18 @@ function loadCrosses(key: string): Cell[] {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(isStoredCell);
+  } catch {
+    return [];
+  }
+}
+
+function loadEdgeMarks(key: string): NoteEdgeMark[] {
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isNoteEdgeMark);
   } catch {
     return [];
   }
@@ -202,10 +215,12 @@ export function GameScreen({
   const myMine = locked.mine;
   const notesKey = `prisme:notes:${state.readyAt ?? 'local'}`;
   const crossesKey = `prisme:crosses:${state.readyAt ?? 'local'}`;
+  const edgesKey = `prisme:edges:${state.readyAt ?? 'local'}`;
   const [tab, setTab] = useState<'prospection' | 'mine'>('prospection');
   const [mode, setMode] = useState<'scan' | 'notes'>('scan');
   const [notes, setNotes] = useState<Mine>(() => loadNotes(notesKey));
   const [crosses, setCrosses] = useState<Cell[]>(() => loadCrosses(crossesKey));
+  const [edgeMarks, setEdgeMarks] = useState<NoteEdgeMark[]>(() => loadEdgeMarks(edgesKey));
   const [simulation, setSimulation] = useState<{ entryLabel: string; result: RayResult } | null>(
     null,
   );
@@ -231,6 +246,14 @@ export function GameScreen({
       // Les croix restent en mémoire si le stockage est indisponible.
     }
   }, [crosses, crossesKey]);
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(edgesKey, JSON.stringify(edgeMarks));
+    } catch {
+      // Les arêtes restent en mémoire si le stockage est indisponible.
+    }
+  }, [edgeMarks, edgesKey]);
 
   const notesSimulationValidation = useMemo(
     () => validateMine(notes, { enforceWhiteSymmetry: settings.enforceWhiteSymmetry }),
@@ -548,6 +571,8 @@ export function GameScreen({
                   onChange={updateNotes}
                   crosses={crosses}
                   onCrossesChange={setCrosses}
+                  edgeMarks={edgeMarks}
+                  onEdgeMarksChange={setEdgeMarks}
                   boardAriaLabel="Plateau de notes privées"
                   path={simulation?.result.path ?? null}
                   pathColor={simulation?.result.color ?? 'white'}

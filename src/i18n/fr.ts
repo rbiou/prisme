@@ -50,6 +50,18 @@ export const fr = {
     crossHint:
       'Touchez une case pour la marquer comme vide, ou touchez à nouveau pour retirer la croix.',
     clearCrosses: 'Effacer les croix',
+    edgeTool: 'Arêtes',
+    edgeSide: 'Côté de la case',
+    edgeColor: 'Couleur',
+    edgeTop: 'Haut',
+    edgeRight: 'Droite',
+    edgeBottom: 'Bas',
+    edgeLeft: 'Gauche',
+    edgeDiagonalDown: 'Diagonale descendante',
+    edgeDiagonalUp: 'Diagonale montante',
+    edgeHint:
+      'Choisissez un côté et la couleur de la gemme concernée, puis touchez une case. Touchez à nouveau la même arête pour la retirer.',
+    clearEdges: 'Effacer les arêtes',
     coordinateLabel: 'Coordonnées d’ancrage',
     coordinatePlaceholder: 'E4',
     placeAt: 'Placer',
