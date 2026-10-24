@@ -51,6 +51,9 @@ l'invité saisit ce code sur l'accueil.
   les échanges de jeu passent directement entre les navigateurs.
 - La mine secrète reste locale. Seuls le point de sortie et la couleur d'un
   rayon sont échangés.
+- Une coupure est reprise automatiquement : le joueur restant garde le code,
+  puis les deux clients resynchronisent l'état public. Après fermeture de
+  l'application, un bouton permet de reprendre depuis une sauvegarde locale.
 - PWA installable, mises à jour proposées et jamais imposées pendant une partie.
 - Déploiement statique sur GitHub Pages, URLs en hash, assets relatifs.
 
@@ -60,7 +63,8 @@ l'invité saisit ce code sur l'accueil.
   sans TURN. Un message clair invite à réessayer sur un autre réseau.
 - Le courtier public PeerJS doit être joignable au moment du rendez-vous. Il ne
   voit pas les données de jeu, qui restent en WebRTC direct.
-- Une connexion WebRTC ne survit pas au rechargement de la page.
+- La reprise après fermeture dépend du stockage local du navigateur. Si les
+  données du site sont effacées, la partie ne peut pas être restaurée.
 - Le pair-à-pair repose sur la confiance ; un engagement SHA-256 et une
   vérification a posteriori permettent de détecter certaines incohérences.
 - Le code à six chiffres n'est pas un secret fort : un tiers peut théoriquement

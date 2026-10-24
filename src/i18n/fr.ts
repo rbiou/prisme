@@ -96,6 +96,9 @@ export const fr = {
     leaving: 'Quitter',
     leaveTitle: 'Quitter le salon ?',
     leaveBody: 'Le code sera libéré et la connexion avec votre adversaire sera fermée.',
+    reconnecting: 'Connexion interrompue — reprise en cours…',
+    reconnectingHint:
+      'Le salon reste ouvert. La connexion reprend automatiquement dès que possible.',
     failedTitle: 'La connexion n’a pas abouti',
     failedBody:
       'Vérifiez le code et le réseau. Si le problème persiste, essayez le Wi-Fi ou créez une nouvelle partie.',
@@ -147,7 +150,10 @@ export const fr = {
     waitingOpponent: 'En attente de l’adversaire…',
     connectionLost: 'Connexion interrompue',
     connectionLostHint:
-      'La partie est en pause. Une connexion WebRTC ne peut pas reprendre après une coupure : créez un nouveau salon.',
+      'La partie est en pause. Réessayez la connexion avec le même code ; si le salon a été fermé, créez une nouvelle partie.',
+    reconnecting: 'Connexion interrompue — reprise en cours…',
+    reconnectingHint:
+      'La partie reprend automatiquement dès que la connexion est rétablie. Vous pouvez aussi revenir à l’accueil et reprendre avec le code.',
     revealPending: 'En attente de la révélation adverse…',
     ownMine: 'Votre mine',
     opponentMine: 'Mine adverse',

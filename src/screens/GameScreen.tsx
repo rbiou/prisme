@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Board } from '../components/Board';
 import { ColorChip } from '../components/ColorChip';
+import { ColorMixLegend } from '../components/ColorMixLegend';
 import { Dialog } from '../components/Dialog';
 import { MineComposer } from '../components/MineComposer';
 import { ALL_ENTRIES, cellLabel, isCell, parseCellLabel, sideLabel } from '../engine/board';
@@ -36,6 +37,7 @@ export interface GameScreenProps {
   onRequestConfirmation: (answerId: string) => boolean;
   onVerifySubmission: () => boolean;
   onSubmit: (candidate: SerializedMine) => boolean;
+  onResume: () => void;
   onLeave: () => void;
   onNewGame: () => void;
   onHome: () => void;
@@ -205,6 +207,7 @@ export function GameScreen({
   onRequestConfirmation,
   onVerifySubmission,
   onSubmit,
+  onResume,
   onLeave,
   onNewGame,
   onHome,
@@ -270,8 +273,23 @@ export function GameScreen({
   );
 
   const isMyTurn = game.turn === role;
-  const canScanNow = canScan(game, role);
-  const canSubmitNow = canSubmit(game, role);
+  const connected = state.sessionPhase === 'ready' && state.transportStatus === 'connected';
+  const reconnecting =
+    state.sessionPhase === 'reconnecting' ||
+    (state.transportStatus === 'disconnected' &&
+      state.sessionPhase !== 'failed' &&
+      state.sessionPhase !== 'closed');
+  const canScanNow = canScan(game, role) && connected;
+  const canSubmitNow = canSubmit(game, role) && connected;
+  const askedEntries = useMemo(
+    () =>
+      new Set(
+        game.scans
+          .map((scan) => scan.entry?.label)
+          .filter((label): label is string => Boolean(label)),
+      ),
+    [game.scans],
+  );
   const incomingScan = game.pendingScan && game.pendingScan.by !== role ? game.pendingScan : null;
   const incomingConfirmation =
     game.pendingConfirmation && game.pendingConfirmation.by !== role
@@ -421,7 +439,6 @@ export function GameScreen({
   }
 
   const connectionBroken =
-    state.transportStatus === 'disconnected' ||
     state.transportStatus === 'failed' ||
     state.transportStatus === 'closed' ||
     state.sessionPhase === 'failed' ||
@@ -457,10 +474,27 @@ export function GameScreen({
         </span>
       </div>
 
+      {reconnecting && !connectionBroken ? (
+        <section className="status-panel status-panel--warning" role="status" aria-live="polite">
+          <h2>{fr.game.reconnecting}</h2>
+          <p>{fr.game.reconnectingHint}</p>
+          <div className="button-row">
+            <button type="button" className="btn btn--ghost btn--small" onClick={onResume}>
+              Relancer la tentative
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       {connectionBroken ? (
         <section className="status-panel status-panel--warning" role="alert">
           <h2>{fr.game.connectionLost}</h2>
           <p>{fr.game.connectionLostHint}</p>
+          <div className="button-row">
+            <button type="button" className="btn btn--primary" onClick={onResume}>
+              Réessayer la connexion
+            </button>
+          </div>
         </section>
       ) : null}
 
@@ -518,6 +552,7 @@ export function GameScreen({
                 <div className="board-frame">
                   <Board
                     notes={notes}
+                    askedEntries={askedEntries}
                     interactiveEntries={canScanNow}
                     interactiveCells={canScanNow}
                     onEntryAction={onWave}
@@ -748,6 +783,8 @@ export function GameScreen({
                   <ColorChip key={color} color={color} size="small" />
                 ))}
               </div>
+              <h3 className="legend-subtitle">Mélanges</h3>
+              <ColorMixLegend />
             </section>
           </aside>
         </div>
@@ -998,8 +1035,8 @@ export function GameScreen({
         }
       >
         <p>
-          La connexion sera fermée et la partie ne pourra pas reprendre. Une connexion WebRTC
-          interrompue nécessite une nouvelle invitation.
+          La connexion sera fermée et la sauvegarde de reprise sera effacée. Il faudra créer une
+          nouvelle partie pour rejouer.
         </p>
       </Dialog>
     </div>

@@ -1,7 +1,12 @@
+import { entryForLabel, isCell } from './board';
+import { isGemColor, isRayColor } from './colors';
+import { isSerializedMine } from './mine';
 import type {
+  Cell,
   EndReason,
   Entry,
   GameActionResult,
+  GamePhase,
   GameState,
   PendingScan,
   PendingSubmission,
@@ -302,4 +307,137 @@ export function endReasonLabel(reason: EndReason | undefined): string {
     default:
       return '';
   }
+}
+
+const GAME_PHASES: GamePhase[] = [
+  'playing',
+  'awaiting-answer',
+  'awaiting-verification',
+  'final-turn',
+  'ended',
+];
+
+const END_REASONS: EndReason[] = [
+  'non-starter-correct',
+  'starter-correct-opponent-wrong',
+  'starter-correct-opponent-correct',
+  'wrong-submission',
+  'forfeit',
+];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isPlayerIdValue(value: unknown): value is PlayerId {
+  return value === 'host' || value === 'guest';
+}
+
+function isEntryValue(value: unknown): value is Entry {
+  if (!isRecord(value) || typeof value.label !== 'string') return false;
+  const entry = entryForLabel(value.label);
+  return Boolean(
+    entry &&
+    entry.side === value.side &&
+    entry.index === value.index &&
+    typeof value.index === 'number',
+  );
+}
+
+function isCellValue(value: unknown): value is Cell {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.col === 'number' &&
+    typeof value.row === 'number' &&
+    isCell({ col: value.col, row: value.row })
+  );
+}
+
+function isScanAnswerValue(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (value.kind === 'wave') {
+    return isEntryValue(value.exit) && typeof value.color === 'string' && isRayColor(value.color);
+  }
+  if (value.kind === 'cell') {
+    return value.color === null || (typeof value.color === 'string' && isGemColor(value.color));
+  }
+  return false;
+}
+
+function isPendingScanValue(value: unknown): value is PendingScan {
+  if (!isRecord(value)) return false;
+  if (typeof value.id !== 'string' || !isPlayerIdValue(value.by)) return false;
+  if (value.kind === 'wave') return isEntryValue(value.entry);
+  if (value.kind === 'cell') return isCellValue(value.cell);
+  return false;
+}
+
+function isPendingSubmissionValue(value: unknown): value is PendingSubmission {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    isPlayerIdValue(value.by) &&
+    isSerializedMine(value.candidate)
+  );
+}
+
+function isScanRecordValue(value: unknown): value is ScanRecord {
+  if (!isRecord(value)) return false;
+  if (typeof value.id !== 'string' || !isPlayerIdValue(value.by)) return false;
+  if (value.kind !== 'wave' && value.kind !== 'cell') return false;
+  if (value.entry !== undefined && !isEntryValue(value.entry)) return false;
+  if (value.cell !== undefined && !isCellValue(value.cell)) return false;
+  if (value.confirmationOf !== undefined && typeof value.confirmationOf !== 'string') return false;
+  if (typeof value.createdAt !== 'number') return false;
+  return isScanAnswerValue(value.answer);
+}
+
+function isSubmissionRecordValue(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    isPlayerIdValue(value.by) &&
+    isSerializedMine(value.candidate) &&
+    typeof value.correct === 'boolean' &&
+    typeof value.createdAt === 'number'
+  );
+}
+
+/** Valide un état de partie reçu par le réseau avant de l’appliquer. */
+export function isGameState(value: unknown): value is GameState {
+  if (!isRecord(value)) return false;
+  if (typeof value.phase !== 'string' || !GAME_PHASES.includes(value.phase as GamePhase)) {
+    return false;
+  }
+  if (!isPlayerIdValue(value.starter) || !isPlayerIdValue(value.turn)) return false;
+  if (value.finalTurnFor !== undefined && !isPlayerIdValue(value.finalTurnFor)) return false;
+  if (value.pendingScan !== undefined && !isPendingScanValue(value.pendingScan)) return false;
+  if (value.pendingConfirmation !== undefined) {
+    const pending = value.pendingConfirmation;
+    if (
+      !isRecord(pending) ||
+      typeof pending.id !== 'string' ||
+      !isPlayerIdValue(pending.by) ||
+      typeof pending.answerId !== 'string'
+    ) {
+      return false;
+    }
+  }
+  if (value.pendingSubmission !== undefined && !isPendingSubmissionValue(value.pendingSubmission)) {
+    return false;
+  }
+  if (!Array.isArray(value.scans) || value.scans.length > 2000) return false;
+  if (!value.scans.every(isScanRecordValue)) return false;
+  if (!Array.isArray(value.submissions) || value.submissions.length > 200) return false;
+  if (!value.submissions.every(isSubmissionRecordValue)) return false;
+  if (value.winner !== undefined && value.winner !== 'draw' && !isPlayerIdValue(value.winner)) {
+    return false;
+  }
+  if (
+    value.endReason !== undefined &&
+    (typeof value.endReason !== 'string' || !END_REASONS.includes(value.endReason as EndReason))
+  ) {
+    return false;
+  }
+  return true;
 }

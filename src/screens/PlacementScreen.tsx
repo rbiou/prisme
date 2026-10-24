@@ -28,6 +28,9 @@ export interface PlacementScreenProps {
   locked: LockedMine | null;
   settings: Settings;
   error: string | null;
+  reconnecting?: boolean;
+  connectionLost?: boolean;
+  onResume?: () => void;
   onLock: (mine: Mine) => Promise<ActionResult>;
 }
 
@@ -38,6 +41,9 @@ export function PlacementScreen({
   locked,
   settings,
   error,
+  reconnecting = false,
+  connectionLost = false,
+  onResume,
   onLock,
 }: PlacementScreenProps) {
   const [mine, setMine] = useState<Mine>(() => locked?.mine ?? loadDraft());
@@ -93,6 +99,20 @@ export function PlacementScreen({
           <p className="lead">{fr.placement.intro}</p>
         </div>
       </div>
+
+      {reconnecting || connectionLost ? (
+        <section className="status-panel status-panel--warning" role="status">
+          <h2>{connectionLost ? fr.game.connectionLost : fr.game.reconnecting}</h2>
+          <p>{connectionLost ? fr.game.connectionLostHint : fr.game.reconnectingHint}</p>
+          {connectionLost && onResume ? (
+            <div className="button-row">
+              <button type="button" className="btn btn--primary" onClick={onResume}>
+                Réessayer la connexion
+              </button>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {locked ? (
         <section className="locked-banner">
@@ -155,7 +175,7 @@ export function PlacementScreen({
                 type="button"
                 className="btn btn--primary btn--wide"
                 onClick={() => void lock()}
-                disabled={!validation.ok || busy}
+                disabled={!validation.ok || busy || reconnecting || connectionLost}
               >
                 {busy ? fr.placement.locking : fr.placement.lock}
               </button>

@@ -14,7 +14,9 @@ export interface LobbyScreenProps {
   opponentName: string;
   detail: string | null;
   error: string | null;
+  canResume?: boolean;
   onStart: () => boolean;
+  onResume?: () => void;
   onLeave: () => void;
   onHome: () => void;
 }
@@ -60,6 +62,11 @@ function statusLabel(
         title: 'La partie est lancée.',
         text: 'Placement des mines en cours…',
       };
+    case 'reconnecting':
+      return {
+        title: fr.lobby.reconnecting,
+        text: fr.lobby.reconnectingHint,
+      };
     case 'failed':
     case 'closed':
       return {
@@ -82,7 +89,9 @@ export function LobbyScreen({
   opponentName,
   detail,
   error,
+  canResume = false,
   onStart,
+  onResume,
   onLeave,
   onHome,
 }: LobbyScreenProps) {
@@ -126,9 +135,20 @@ export function LobbyScreen({
           <h2>{fr.lobby.failedTitle}</h2>
           <p>{error ?? fr.lobby.failedBody}</p>
           <div className="button-row">
-            <button type="button" className="btn btn--primary" onClick={onHome}>
-              {fr.lobby.retryHome}
-            </button>
+            {canResume && onResume ? (
+              <>
+                <button type="button" className="btn btn--primary" onClick={onResume}>
+                  Réessayer la connexion
+                </button>
+                <button type="button" className="btn btn--ghost" onClick={onHome}>
+                  {fr.lobby.retryHome}
+                </button>
+              </>
+            ) : (
+              <button type="button" className="btn btn--primary" onClick={onHome}>
+                {fr.lobby.retryHome}
+              </button>
+            )}
           </div>
         </section>
       ) : (

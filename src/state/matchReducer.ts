@@ -77,8 +77,33 @@ export const initialMatchState: MatchState = {
   readyAt: null,
 };
 
+/** État minimal conservé pour reprendre une partie après une coupure. */
+export interface ResumeData {
+  role: PlayerId;
+  playerName: string;
+  roomCode: string;
+  sessionPhase: SessionPhase;
+  locked: LockedMine | null;
+  starter: PlayerId | null;
+  opponentName: string;
+  opponentNonce: string | null;
+  opponentHash: string | null;
+  game: GameState | null;
+  reveals: Partial<Record<PlayerId, RevealRecord>>;
+  readyAt: number | null;
+}
+
 export type MatchAction =
   | { type: 'begin'; role: PlayerId; playerName: string }
+  | { type: 'hydrate'; data: ResumeData }
+  | {
+      type: 'adopt';
+      game: GameState | null;
+      starter: PlayerId | null;
+      opponentHash: string | null;
+      reveals: Partial<Record<PlayerId, RevealRecord>>;
+    }
+  | { type: 'merge-reveals'; reveals: Partial<Record<PlayerId, RevealRecord>> }
   | { type: 'reset'; keepName?: boolean }
   | { type: 'phase'; phase: SessionPhase; detail?: string | null }
   | { type: 'transport'; status: PeerStatus; detail?: string | null }
@@ -326,6 +351,40 @@ export function matchReducer(state: MatchState, action: MatchAction): MatchState
         ...initialMatchState,
         role: action.role,
         playerName: action.playerName,
+      };
+    case 'hydrate':
+      return {
+        ...initialMatchState,
+        role: action.data.role,
+        playerName: action.data.playerName,
+        roomCode: action.data.roomCode,
+        sessionPhase: 'reconnecting',
+        sessionDetail: 'Reprise de la partie…',
+        transportStatus: 'opening',
+        locked: action.data.locked,
+        starter: action.data.starter,
+        opponentName: action.data.opponentName || 'Adversaire',
+        opponentNonce: action.data.opponentNonce,
+        opponentHash: action.data.opponentHash,
+        game: action.data.game,
+        reveals: action.data.reveals,
+        readyAt: action.data.readyAt,
+      };
+    case 'adopt':
+      return {
+        ...state,
+        game: action.game ?? state.game,
+        starter: action.starter ?? state.starter,
+        opponentHash: action.opponentHash ?? state.opponentHash,
+        reveals: { ...state.reveals, ...action.reveals },
+        sessionPhase: 'ready',
+        sessionDetail: null,
+        warning: null,
+      };
+    case 'merge-reveals':
+      return {
+        ...state,
+        reveals: { ...state.reveals, ...action.reveals },
       };
     case 'reset':
       return {

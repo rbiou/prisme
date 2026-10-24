@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { SerializedMine } from '../engine/types';
+import { createGame } from '../engine/endgame';
 import {
   chooseStarter,
   createCommit,
   createHello,
   createLobbyStart,
   createStart,
+  createSync,
   isNetworkMessage,
   newMessageId,
   parseNetworkMessage,
@@ -82,6 +84,41 @@ describe('protocole réseau', () => {
     expect(parse({ ...start, starter: 'autre' })).toBeNull();
     expect(parse({ ...start, hostHash: 'court' })).toBeNull();
     expect(parse({ ...start, guestHash: undefined })).toBeNull();
+  });
+
+  it('accepte un état de partie synchronisé', () => {
+    const sync = createSync('host', {
+      round: 3,
+      mineHash: HASH_A,
+      starter: 'host',
+      game: createGame('host'),
+      reveals: [{ from: 'guest', mine: CANDIDATE, salt: SALT }],
+    });
+    expect(parse(sync)).toMatchObject({
+      type: 'sync',
+      from: 'host',
+      round: 3,
+      mineHash: HASH_A,
+      starter: 'host',
+      reveals: [{ from: 'guest', mine: CANDIDATE, salt: SALT }],
+    });
+    expect(parse({ ...sync, round: -1 })).toBeNull();
+    expect(parse({ ...sync, mineHash: 'court' })).toBeNull();
+    expect(parse({ ...sync, starter: 'autre' })).toBeNull();
+    expect(parse({ ...sync, reveals: [{ from: 'guest', mine: CANDIDATE, salt: 'x' }] })).toBeNull();
+  });
+
+  it('refuse un état de partie mal formé', () => {
+    const sync = createSync('host', {
+      round: 1,
+      mineHash: HASH_A,
+      starter: 'host',
+      game: createGame('host'),
+      reveals: [],
+    });
+    expect(parse({ ...sync, game: { ...createGame('host'), phase: 'inconnue' } })).toBeNull();
+    expect(parse({ ...sync, game: { ...createGame('host'), starter: 'autre' } })).toBeNull();
+    expect(parse({ ...sync, game: { ...createGame('host'), scans: [{}] } })).toBeNull();
   });
 
   it('accepte les scans de rayon et de case', () => {

@@ -1,11 +1,18 @@
-import { isValidEntryLabel } from '../engine/board';
+import { isCell, isValidEntryLabel } from '../engine/board';
 import { isGemColor, isRayColor } from '../engine/colors';
-import { isCell } from '../engine/board';
+import { isGameState } from '../engine/endgame';
 import { isSerializedMine } from '../engine/mine';
-import type { Cell, GemColor, PlayerId, RayColor, SerializedMine } from '../engine/types';
+import type {
+  Cell,
+  GemColor,
+  GameState,
+  PlayerId,
+  RayColor,
+  SerializedMine,
+} from '../engine/types';
 import { isHex, randomHex } from './integrity';
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 export const MAX_NAME_LENGTH = 40;
 export const MAX_ID_LENGTH = 64;
 
@@ -41,6 +48,24 @@ export interface StartMessage extends MessageBase {
   guestNonce: string;
   hostHash: string;
   guestHash: string;
+}
+
+export interface SyncReveal {
+  from: PlayerId;
+  mine: SerializedMine;
+  salt: string;
+}
+
+/** Échange d’état public après une reconnexion ou une reprise de partie. */
+export interface SyncMessage extends MessageBase {
+  type: 'sync';
+  id: string;
+  from: PlayerId;
+  round: number;
+  mineHash: string | null;
+  starter: PlayerId | null;
+  game: GameState | null;
+  reveals: SyncReveal[];
 }
 
 export interface ScanWaveMessage extends MessageBase {
@@ -158,6 +183,7 @@ export type NetworkMessage =
   | CommitMessage
   | LobbyStartMessage
   | StartMessage
+  | SyncMessage
   | ScanMessage
   | AnswerMessage
   | CancelScanMessage
@@ -231,6 +257,37 @@ export function isNetworkMessage(value: unknown): value is NetworkMessage {
         isHex(value.hostHash, 64) &&
         typeof value.guestHash === 'string' &&
         isHex(value.guestHash, 64)
+      );
+    case 'sync':
+      if (!isMessageId(value.id) || !isPlayerId(value.from)) return false;
+      if (
+        typeof value.round !== 'number' ||
+        !Number.isInteger(value.round) ||
+        value.round < 0 ||
+        value.round > 100000
+      ) {
+        return false;
+      }
+      if (
+        value.mineHash !== null &&
+        !(typeof value.mineHash === 'string' && isHex(value.mineHash, 64))
+      ) {
+        return false;
+      }
+      if (value.starter !== null && !isPlayerId(value.starter)) return false;
+      if (value.game !== null && value.starter === null) return false;
+      if (value.game !== null && !isGameState(value.game)) return false;
+      return (
+        Array.isArray(value.reveals) &&
+        value.reveals.length <= 2 &&
+        value.reveals.every(
+          (reveal) =>
+            isRecord(reveal) &&
+            isPlayerId(reveal.from) &&
+            isSerializedMine(reveal.mine) &&
+            typeof reveal.salt === 'string' &&
+            isHex(reveal.salt, 32),
+        )
       );
     case 'scan':
       if (!isMessageId(value.id) || !isPlayerId(value.from)) return false;
@@ -328,6 +385,13 @@ export function createCommit(from: PlayerId, mineHash: string, id = newMessageId
 
 export function createLobbyStart(id = newMessageId()): LobbyStartMessage {
   return { protocol: PROTOCOL_VERSION, type: 'lobby-start', id, from: 'host' };
+}
+
+export function createSync(
+  from: PlayerId,
+  payload: Omit<SyncMessage, 'protocol' | 'type' | 'id' | 'from'>,
+): SyncMessage {
+  return { protocol: PROTOCOL_VERSION, type: 'sync', id: newMessageId(), from, ...payload };
 }
 
 export function createStart(

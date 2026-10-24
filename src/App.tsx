@@ -38,9 +38,13 @@ export default function App() {
   const hadGameRef = useRef(false);
 
   const gameActive = Boolean(state.game && state.game.phase !== 'ended');
-  const matchInProgress = Boolean(
-    state.role && state.sessionPhase !== 'failed' && state.sessionPhase !== 'closed',
+  const sessionActive = Boolean(
+    state.role &&
+    state.sessionPhase !== 'failed' &&
+    state.sessionPhase !== 'closed' &&
+    state.game?.phase !== 'ended',
   );
+  const matchInProgress = sessionActive;
   const pwa = usePwaUpdate(matchInProgress);
 
   // Dès que l’hôte lance le placement, les deux joueurs passent à l’écran de
@@ -67,14 +71,23 @@ export default function App() {
   }, [navigate, state.game, state.locked]);
 
   useEffect(() => {
-    if (!matchInProgress) return;
+    if (!sessionActive) return;
     const handler = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = '';
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
-  }, [matchInProgress]);
+  }, [sessionActive]);
+
+  // Une sauvegarde existe mais la session n'est pas encore restaurée : on
+  // revient à l'accueil pour proposer la reprise au lieu d'afficher un écran vide.
+  useEffect(() => {
+    if (state.role || !match.resumable) return;
+    if (parsed.name === 'game' || parsed.name === 'placement' || parsed.name === 'lobby') {
+      navigate('');
+    }
+  }, [match.resumable, navigate, parsed.name, state.role]);
 
   useEffect(() => {
     const titles: Record<string, string> = {
@@ -107,6 +120,14 @@ export default function App() {
   }
 
   function resume() {
+    const recoverable =
+      (!state.role && match.resumable) || (matchLost && Boolean(state.role && state.roomCode));
+    if (recoverable) {
+      const target = match.resumeTarget;
+      void match.resumeGame();
+      navigate(target === 'game' ? 'partie' : target === 'placement' ? 'placer' : 'salon');
+      return;
+    }
     if (state.game) {
       navigate('partie');
       return;
@@ -134,13 +155,19 @@ export default function App() {
     ? state.game.phase === 'ended'
       ? 'Voir le résultat de la partie'
       : 'Reprendre la partie en cours'
-    : !state.role || matchLost
-      ? null
-      : state.sessionPhase === 'placing' || state.sessionPhase === 'awaiting-opponent'
-        ? 'Reprendre le placement de votre mine'
-        : state.locked
-          ? 'Reprendre la partie'
-          : 'Revenir au salon';
+    : matchLost
+      ? (state.role && state.roomCode) || match.resumable
+        ? 'Reprendre la partie interrompue'
+        : null
+      : !state.role
+        ? match.resumable
+          ? 'Reprendre la partie interrompue'
+          : null
+        : state.sessionPhase === 'placing' || state.sessionPhase === 'awaiting-opponent'
+          ? 'Reprendre le placement de votre mine'
+          : state.locked
+            ? 'Reprendre la partie'
+            : 'Revenir au salon';
 
   const headerCurrent =
     parsed.name === 'rules'
@@ -154,7 +181,8 @@ export default function App() {
   const inPlacement =
     state.sessionPhase === 'placing' ||
     state.sessionPhase === 'awaiting-opponent' ||
-    state.sessionPhase === 'ready';
+    state.sessionPhase === 'ready' ||
+    (state.sessionPhase === 'reconnecting' && !state.game);
 
   let content: ReactNode;
   switch (parsed.name) {
@@ -175,7 +203,9 @@ export default function App() {
             opponentName={state.opponentName}
             detail={state.sessionDetail}
             error={state.error}
+            canResume={Boolean(state.role && state.roomCode) || match.resumable}
             onStart={startPlacement}
+            onResume={() => void match.resumeGame()}
             onLeave={leaveMatch}
             onHome={leaveMatch}
           />
@@ -193,6 +223,9 @@ export default function App() {
             locked={state.locked}
             settings={settings}
             error={state.error}
+            reconnecting={state.sessionPhase === 'reconnecting'}
+            connectionLost={state.sessionPhase === 'failed' || state.sessionPhase === 'closed'}
+            onResume={() => void match.resumeGame()}
             onLock={match.lockMine}
           />
         ) : (
@@ -213,6 +246,7 @@ export default function App() {
             onRequestConfirmation={match.requestConfirmationOf}
             onVerifySubmission={match.verifyIncomingSubmission}
             onSubmit={match.submitCandidate}
+            onResume={() => void match.resumeGame()}
             onLeave={leaveMatch}
             onNewGame={leaveMatch}
             onHome={goHome}

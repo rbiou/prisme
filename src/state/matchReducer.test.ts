@@ -25,6 +25,45 @@ function stateWithPendingScan(): MatchState {
   };
 }
 
+describe('matchReducer — reprise de partie', () => {
+  it('adopte l’état public le plus avancé après une reconnexion', () => {
+    const advanced: ReturnType<typeof createGame> = {
+      ...createGame('host'),
+      phase: 'final-turn',
+      turn: 'guest',
+      finalTurnFor: 'guest',
+      scans: [
+        {
+          id: 'scan-1',
+          by: 'host',
+          kind: 'cell',
+          cell: { col: 0, row: 0 },
+          answer: { kind: 'cell', color: 'red' },
+          createdAt: 1,
+        },
+      ],
+    };
+    const state: MatchState = {
+      ...initialMatchState,
+      role: 'host',
+      sessionPhase: 'reconnecting',
+      game: createGame('host'),
+    };
+
+    const next = matchReducer(state, {
+      type: 'adopt',
+      game: advanced,
+      starter: 'host',
+      opponentHash: 'a'.repeat(64),
+      reveals: {},
+    });
+
+    expect(next.game).toEqual(advanced);
+    expect(next.opponentHash).toBe('a'.repeat(64));
+    expect(next.sessionPhase).toBe('ready');
+  });
+});
+
 describe('matchReducer — notifications de réponse', () => {
   it('affiche une notification quand l’adversaire répond à notre rayon', () => {
     const next = matchReducer(stateWithPendingScan(), {

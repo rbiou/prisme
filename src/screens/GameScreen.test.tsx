@@ -46,6 +46,7 @@ function renderGame(game: GameState = createGame('host')) {
   const onRequestConfirmation = vi.fn(() => true);
   const onVerifySubmission = vi.fn(() => true);
   const onSubmit = vi.fn(() => true);
+  const onResume = vi.fn();
   const onLeave = vi.fn();
   const onNewGame = vi.fn();
   const onHome = vi.fn();
@@ -62,6 +63,7 @@ function renderGame(game: GameState = createGame('host')) {
       onRequestConfirmation={onRequestConfirmation}
       onVerifySubmission={onVerifySubmission}
       onSubmit={onSubmit}
+      onResume={onResume}
       onLeave={onLeave}
       onNewGame={onNewGame}
       onHome={onHome}
@@ -108,6 +110,38 @@ describe('GameScreen', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Rayon depuis le haut, entrée 1' }));
     expect(onWave).toHaveBeenCalledWith('1');
+  });
+
+  it('grise les étiquettes de rayon déjà demandées', () => {
+    const game: GameState = {
+      ...createGame('host'),
+      scans: [
+        {
+          id: 'scan-asked',
+          by: 'host',
+          kind: 'wave',
+          entry: entryForLabel('3'),
+          answer: {
+            kind: 'wave',
+            exit: entryForLabel('12') as NonNullable<ReturnType<typeof entryForLabel>>,
+            color: 'orange',
+          },
+          createdAt: 1,
+        },
+      ],
+    };
+    renderGame(game);
+
+    const asked = document.querySelectorAll('.board-entry.is-asked');
+    expect(asked).toHaveLength(1);
+    expect(asked[0]?.textContent).toContain('3');
+  });
+
+  it('affiche la table des mélanges de couleurs', () => {
+    renderGame();
+
+    expect(screen.getByLabelText('Table des seize mélanges')).toBeInTheDocument();
+    expect(screen.getByText('Mélanges')).toBeInTheDocument();
   });
 
   it('demande une confirmation privée avant de répondre à un scan adverse', () => {

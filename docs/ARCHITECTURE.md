@@ -74,6 +74,7 @@ entre les deux navigateurs.
 │   │   ├── matchReducer.ts
 │   │   ├── useMatch.ts
 │   │   ├── integrityCheck.ts
+│   │   ├── resume.ts
 │   │   └── settings.ts
 │   ├── hooks/
 │   │   ├── useHashRoute.ts
@@ -84,6 +85,7 @@ entre les deux navigateurs.
 │   │   ├── AppHeader.tsx
 │   │   ├── Board.tsx
 │   │   ├── ColorChip.tsx
+│   │   ├── ColorMixLegend.tsx
 │   │   ├── Dialog.tsx
 │   │   ├── MineComposer.tsx
 │   │   └── PwaBanner.tsx
@@ -278,8 +280,11 @@ du canal de données sont la source des actions distantes.
   Les arêtes sont stockées sous forme canonique pour qu'une arête partagée par
   deux cases ne soit enregistrée qu'une fois.
 - `settings` : options de règles et d'accessibilité.
-- `session` : rôle, code de salon, phase (salon, placement, attente, prête) et
-  état de connexion.
+- `session` : rôle, code de salon, phase (salon, placement, attente, prête,
+  reprise) et état de connexion.
+- `resume` : dans `localStorage`, code, rôle, nonce, mine verrouillée (mine,
+  sel, engagement) et dernier état public. Utilisé pour reprendre après une
+  fermeture de l'application ; effacé à la fin de la partie ou au départ.
 
 Les notes et la mine ne sont jamais incluses dans les messages publics avant la
 révélation finale.
@@ -318,21 +323,25 @@ navigation suit la session : accueil → salon → placement → partie.
 - `RTCPeerConnection` avec serveurs STUN publics uniquement, pas de TURN.
 - Un seul canal de données fiable et ordonné, label `prisme`, sérialisation
   JSON.
-- L'hôte écoute les connexions entrantes ; l'invité se connecte à
-  `prisme-v1-<code>`.
+- Au départ, l'hôte détient `prisme-v1-<code>` et écoute les connexions
+  entrantes ; l'invité s'y connecte.
+- Si le canal tombe, chaque client tente de reprendre le code. Le premier qui y
+  parvient devient le détenteur du rendez-vous et accepte la connexion de
+  l'autre. Les rôles logiques `host`/`guest` ne changent pas.
+- À la réouverture du canal, les deux envoient `hello`, `commit` si nécessaire,
+  puis `sync`. L'état public le plus avancé est adopté ; la mine locale reste
+  privée.
 - Pas de TURN. En cas d'échec, message explicite et proposition de réessayer sur
   un autre réseau.
 - Délais : 15 s pour l'enregistrement PeerJS, 20 s pour rejoindre le salon ou
-  terminer la poignée de main.
-- Pas de reconnexion de partie : une coupure du canal met la partie en pause et
-  invite à créer un nouveau salon. Le pair PeerJS tente seulement de rétablir
-  son lien avec le courtier si celui-ci tombe.
+  terminer la poignée de main, 45 s de silence avant une reprise forcée.
 
 ### 7.3 Protocole
 
 Voir `docs/PROTOCOL.md`. Les messages sont des objets JSON avec un champ `type`
-et `protocol: 2`. Ils sont validés par des guards avant application. Les
-messages inconnus ou mal formés sont ignorés.
+et `protocol: 3`. Ils sont validés par des guards avant application. Les
+messages inconnus ou mal formés sont ignorés. Le message `sync` transporte
+l'état public et les révélations déjà reçues, jamais la mine secrète.
 
 ### 7.4 Démarrage
 

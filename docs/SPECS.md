@@ -36,7 +36,7 @@ puis les échanges passent directement entre les deux navigateurs.
 - Appariement automatique, comptes, classement, chat.
 - Courtier de rendez-vous auto-hébergé, TURN, stockage cloud.
 - QR code du code de salon (prévu plus tard).
-- Mode hors ligne complet avec reprise d'une connexion WebRTC.
+- Reprise d'une partie dont le stockage local a été effacé.
 - Anti-triche fort : la confiance reste nécessaire, avec vérification a
   posteriori.
 
@@ -47,6 +47,8 @@ puis les échanges passent directement entre les deux navigateurs.
 - Champ **Votre nom**.
 - Bouton **Créer une partie**.
 - Bouton **Rejoindre une partie** avec un champ de code à six chiffres.
+- Bouton **Reprendre la partie interrompue** si une sauvegarde locale existe
+  (coupure, fermeture de l'application).
 - Accès aux **Règles** et aux **Réglages** (règle de symétrie 2025, réduction
   des animations).
 - Bandeau discret si une mise à jour PWA est disponible.
@@ -93,6 +95,11 @@ l'adversaire », « Réponse en attente de confirmation », « Dernier tour ».
 Quand l'adversaire répond à une question ou à une confirmation, une notification
 discrète apparaît en surimpression de l'écran et disparaît seule après quelques
 secondes. Elle rappelle la question et le résultat reçu sans interrompre le jeu.
+
+Les étiquettes de bord déjà utilisées dans le journal public sont grisées sur le
+plateau de prospection, pour éviter de rejouer un rayon déjà connu. Le panneau
+**Repères de couleur** rappelle les seize mélanges, comme dans les règles
+(rouge + bleu + jaune + blanc = gris, par exemple).
 
 #### Tir de rayon
 
@@ -144,7 +151,24 @@ secondes. Elle rappelle la question et le résultat reçu sans interrompre le je
 - La demande ne change pas le tour ; le défenseur recalcule et confirme.
 - Le journal distingue une confirmation gratuite d'un nouveau scan.
 
-### 5.5 Fin de partie
+### 5.6 Coupure et reprise
+
+- Si la connexion directe tombe pendant le salon, le placement ou la partie,
+  l'écran reste en place avec le message **Connexion interrompue — reprise en
+  cours…**.
+- La reprise est automatique : le joueur restant garde le code du salon, l'autre
+  se reconnecte et les états publics sont resynchronisés.
+- Les rôles logiques ne changent pas, mais le joueur restant devient le
+  détenteur du code tant que l'autre est absent.
+- Après fermeture de l'application, un bouton **Reprendre la partie interrompue**
+  apparaît à l'accueil. La mine verrouillée et l'état public sont relus depuis
+  une sauvegarde locale.
+- Si la reprise automatique échoue, un bouton **Réessayer la connexion** reste
+  disponible sans perdre la partie.
+- La sauvegarde locale est effacée à la fin de la partie ou lors d'un départ
+  volontaire.
+
+### 5.7 Fin de partie
 
 - Écran de résultat : victoire, défaite ou égalité, avec la raison.
 - Révélation des deux mines côte à côte (empilées sur mobile).
@@ -172,6 +196,8 @@ secondes. Elle rappelle la question et le résultat reçu sans interrompre le je
 | F14 | Installer la PWA, cacher l'interface, proposer les mises à jour.                                   |
 | F15 | Fonctionner sur GitHub Pages avec des URLs en hash.                                                |
 | F16 | Afficher des messages clairs en cas d'échec de connexion (NAT, STUN, courtier indisponible).       |
+| F17 | Reprendre automatiquement une partie après une coupure, ou manuellement via le code.               |
+| F18 | Griser les entrées déjà demandées et afficher la table des mélanges de couleurs en partie.         |
 
 ## 7. Exigences non fonctionnelles
 
@@ -182,10 +208,11 @@ secondes. Elle rappelle la question et le résultat reçu sans interrompre le je
 - **Accessibilité** : navigation clavier, focus visible, contrastes AA, libellés
   textuels pour les couleurs, respect de `prefers-reduced-motion`.
 - **Robustesse** : messages réseau validés, état idempotent, aucune mine
-  envoyée avant la fin.
+  envoyée avant la fin, reprise automatique après une coupure.
 - **Confidentialité** : pas de compte, pas d'analytics, pas de cookie, pas de
   stockage serveur. Le courtier public PeerJS ne reçoit que l'identifiant du
-  salon et les métadonnées de connexion, jamais la mine ni les réponses.
+  salon et les métadonnées de connexion, jamais la mine ni les réponses. La
+  sauvegarde de reprise reste sur l'appareil et ne quitte jamais le navigateur.
 - **Hors ligne** : l'interface et les règles sont disponibles hors ligne ; une
   partie en cours nécessite la connexion pair-à-pair.
 
@@ -229,7 +256,7 @@ secondes. Elle rappelle la question et le résultat reçu sans interrompre le je
 | NAT strict, pas de TURN      | STUN public, message d'erreur, conseil Wi-Fi, réessai, nouveau salon.                 |
 | Courtier PeerJS indisponible | Message explicite, réessai, code régénéré si l'identifiant est déjà pris.             |
 | Code à six chiffres deviné   | Salon visible par l'hôte avant lancement, code non secret fort, partie courte.        |
-| Perte de connexion           | Écran explicite, partie non reprise automatiquement, nouveau salon.                   |
+| Perte de connexion           | Reprise automatique, détenteur du code conservé, bouton de réessai et sauvegarde.     |
 | Triche du défenseur          | Engagement de mine, révélation finale, rejeu des réponses, avertissement d'intégrité. |
 | Ambiguïté de scan de case    | Règle de plus grande surface, documentée et testée.                                   |
 | Boucle de rayon              | Rejet de la mine et message avec l'entrée fautive.                                    |

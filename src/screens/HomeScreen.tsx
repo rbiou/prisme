@@ -61,7 +61,7 @@ export function HomeScreen({
       {resumeLabel ? (
         <section className="resume-card">
           <div>
-            <p className="kicker">Partie en cours</p>
+            <p className="kicker">Reprise disponible</p>
             <h2>{resumeLabel}</h2>
           </div>
           <button type="button" className="btn btn--primary" onClick={onResume}>

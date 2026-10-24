@@ -63,7 +63,9 @@ Règles d'architecture :
 5. Aucun backend, aucun TURN. Un courtier public PeerJS assure le rendez-vous :
    l'hôte réserve un code à six chiffres, l'invité le saisit. STUN public
    uniquement pour la connexion directe. Le flux est : création → salon →
-   connexion → lancement par l'hôte → placement des mines → partie.
+   connexion → lancement par l'hôte → placement des mines → partie. En cas de
+   coupure, le joueur restant garde le code et les deux clients se
+   resynchronisent via `sync` ; les rôles logiques ne changent pas.
 6. Pas de routing par historique : utiliser le hash (`#/...`) pour fonctionner
    sur GitHub Pages.
 
@@ -119,7 +121,8 @@ Règles d'architecture :
 - Couvrir au minimum : rotations et aires, mélange des 16 combinaisons, rayons
   (sortie, rebond, boucle), validation du placement (chevauchement, contact,
   hors plateau, gemme cachée), scan de case, machine à états de fin de partie,
-  sérialisation, code de salon, protocole et machine de session.
+  sérialisation, code de salon, protocole, machine de session, reprise après
+  coupure et validation des arêtes de notes.
 - Les tests doivent être déterministes ; pas de dépendance à l'ordre des objets
   ou au hasard non contrôlé.
 - Un bug corrigé doit être accompagné d'un test de régression.
@@ -127,7 +130,10 @@ Règles d'architecture :
 ## Sécurité et vie privée
 
 - La mine secrète reste en mémoire (et éventuellement en `sessionStorage` pour
-  un brouillon). Elle n'est jamais envoyée avant la fin.
+  un brouillon). Pour la reprise après fermeture de l'application, la mine
+  verrouillée, son sel et l'état public sont conservés dans `localStorage` sur
+  l'appareil, puis effacés à la fin de la partie ou au départ. Elle n'est jamais
+  envoyée avant la fin.
 - Un engagement SHA-256 (mine + sel) est échangé au début. À la fin, chaque
   joueur révèle sa mine et son sel ; le client vérifie l'engagement et peut
   rejouer les réponses pour détecter une incohérence.

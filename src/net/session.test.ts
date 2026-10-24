@@ -148,6 +148,7 @@ class FakePeer implements PeerLike {
 
   destroy(): void {
     this.destroyed = true;
+    if (this.network.peers.get(this.id) === this) this.network.peers.delete(this.id);
   }
 
   triggerOpen(): void {
@@ -270,6 +271,11 @@ async function createHarness(extra: MatchSessionOptions = {}): Promise<Harness> 
 async function flush(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
+}
+
+async function waitForReconnect(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  await flush();
 }
 
 function readyHarness(harness: Harness): void {
@@ -526,6 +532,83 @@ describe('session pair-à-pair', () => {
     harness.guest.close();
     expect(harness.guest.phase).toBe('closed');
     expect(harness.guestPeer.destroyed).toBe(true);
+  });
+
+  it('rétablit la connexion après une coupure et reprend la partie', async () => {
+    const harness = await createHarness({ reconnectDelayMs: 0, reconnectTimeoutMs: 10_000 });
+    readyHarness(harness);
+    const beforeMessages = harness.guestMessages.length;
+
+    // Le canal direct tombe : les deux camps reprennent sans perdre la partie.
+    harness.network.pairs[0][1].close();
+    expect(harness.host.phase).toBe('reconnecting');
+    expect(harness.guest.phase).toBe('reconnecting');
+
+    await waitForReconnect();
+    harness.network.openAll();
+    await waitForReconnect();
+
+    expect(harness.host.phase).toBe('ready');
+    expect(harness.guest.phase).toBe('ready');
+
+    const lastPair = harness.network.pairs[harness.network.pairs.length - 1];
+    lastPair[1].send(
+      JSON.stringify({
+        protocol: PROTOCOL_VERSION,
+        type: 'scan',
+        id: 'scan-after-reconnect',
+        from: 'host',
+        kind: 'wave',
+        entry: '1',
+      }),
+    );
+    expect(harness.guestMessages.length).toBe(beforeMessages + 1);
+  });
+
+  it('reprend le placement après une coupure', async () => {
+    const harness = await createHarness({ reconnectDelayMs: 0, reconnectTimeoutMs: 10_000 });
+    expect(harness.host.beginPlacement()).toBe(true);
+    expect(harness.guest.phase).toBe('placing');
+
+    harness.network.pairs[0][1].close();
+    await waitForReconnect();
+    harness.network.openAll();
+    await waitForReconnect();
+
+    expect(harness.host.phase).toBe('placing');
+    expect(harness.guest.phase).toBe('placing');
+  });
+
+  it('reprend une partie après redémarrage grâce au code', async () => {
+    const harness = await createHarness({ reconnectDelayMs: 0, reconnectTimeoutMs: 10_000 });
+    readyHarness(harness);
+
+    // L’hôte ferme son application ; l’invité garde le code.
+    harness.host.close();
+    await waitForReconnect();
+    // L’invité garde le code ouvert en attendant le retour de l’hôte.
+    expect(harness.guest.phase).toBe('reconnecting');
+
+    const hostLobby: string[] = [];
+    const hostReady: ReadyContext[] = [];
+    const resumed = new MatchSession(
+      'host',
+      { name: 'Hôte', nonce: HOST_NONCE },
+      {
+        onLobby: (context) => hostLobby.push(context.remoteName),
+        onReady: (context) => hostReady.push(context),
+      },
+      { peerFactory: harness.network.factory, reconnectDelayMs: 0, reconnectTimeoutMs: 10_000 },
+    );
+    const resumePromise = resumed.resume(harness.code, 'ready', HOST_HASH);
+    await waitForReconnect();
+    harness.network.openAll();
+    await resumePromise;
+
+    expect(resumed.phase).toBe('ready');
+    expect(harness.guest.phase).toBe('ready');
+    expect(hostLobby).toEqual(['Invité']);
+    expect(resumed.roomCode).toBe(harness.code);
   });
 
   it('signale une erreur de pair introuvable', async () => {

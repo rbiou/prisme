@@ -26,6 +26,8 @@ export interface BoardProps {
   notes?: Mine;
   crosses?: Cell[] | null;
   edgeMarks?: NoteEdgeMark[] | null;
+  /** Étiquettes de bord déjà utilisées dans le journal public. */
+  askedEntries?: ReadonlySet<string> | null;
   onCellAction?: (cell: Cell) => void;
   onEntryAction?: (label: string) => void;
   interactiveCells?: boolean;
@@ -89,6 +91,7 @@ export function Board({
   notes,
   crosses = null,
   edgeMarks = null,
+  askedEntries = null,
   onCellAction,
   onEntryAction,
   interactiveCells = false,
@@ -104,6 +107,13 @@ export function Board({
   const entryAction = interactiveEntries && onEntryAction ? onEntryAction : null;
   const pathStroke = RAY_COLOR_SWATCHES[pathColor];
   const style = { '--ray-color': pathStroke } as CSSProperties;
+  const isAsked = (label: string) => Boolean(askedEntries?.has(label));
+  const entryClass = (label: string) =>
+    `board-entry${entryAction ? ' board-entry--active' : ''}${isAsked(label) ? ' is-asked' : ''}`;
+  const entryAria = (side: string, label: string) =>
+    entryAction
+      ? `Rayon depuis ${side}, entrée ${label}${isAsked(label) ? ' (déjà demandé)' : ''}`
+      : undefined;
 
   return (
     <svg
@@ -244,10 +254,10 @@ export function Board({
         {TOP_LABELS.map((label, index) => (
           <g
             key={`top-${label}`}
-            className={`board-entry${entryAction ? ' board-entry--active' : ''}`}
+            className={entryClass(label)}
             role={entryAction ? 'button' : undefined}
             tabIndex={entryAction ? 0 : undefined}
-            aria-label={entryAction ? `Rayon depuis le haut, entrée ${label}` : undefined}
+            aria-label={entryAria('le haut', label)}
             onClick={entryAction ? () => entryAction(label) : undefined}
             onKeyDown={
               entryAction ? (event) => handleKey(event, () => entryAction(label)) : undefined
@@ -270,10 +280,10 @@ export function Board({
         {BOTTOM_LABELS.map((label, index) => (
           <g
             key={`bottom-${label}`}
-            className={`board-entry${entryAction ? ' board-entry--active' : ''}`}
+            className={entryClass(label)}
             role={entryAction ? 'button' : undefined}
             tabIndex={entryAction ? 0 : undefined}
-            aria-label={entryAction ? `Rayon depuis le bas, entrée ${label}` : undefined}
+            aria-label={entryAria('le bas', label)}
             onClick={entryAction ? () => entryAction(label) : undefined}
             onKeyDown={
               entryAction ? (event) => handleKey(event, () => entryAction(label)) : undefined
@@ -296,10 +306,10 @@ export function Board({
         {LEFT_LABELS.map((label, index) => (
           <g
             key={`left-${label}`}
-            className={`board-entry${entryAction ? ' board-entry--active' : ''}`}
+            className={entryClass(label)}
             role={entryAction ? 'button' : undefined}
             tabIndex={entryAction ? 0 : undefined}
-            aria-label={entryAction ? `Rayon depuis la gauche, entrée ${label}` : undefined}
+            aria-label={entryAria('la gauche', label)}
             onClick={entryAction ? () => entryAction(label) : undefined}
             onKeyDown={
               entryAction ? (event) => handleKey(event, () => entryAction(label)) : undefined
@@ -322,10 +332,10 @@ export function Board({
         {RIGHT_LABELS.map((label, index) => (
           <g
             key={`right-${label}`}
-            className={`board-entry${entryAction ? ' board-entry--active' : ''}`}
+            className={entryClass(label)}
             role={entryAction ? 'button' : undefined}
             tabIndex={entryAction ? 0 : undefined}
-            aria-label={entryAction ? `Rayon depuis la droite, entrée ${label}` : undefined}
+            aria-label={entryAria('la droite', label)}
             onClick={entryAction ? () => entryAction(label) : undefined}
             onKeyDown={
               entryAction ? (event) => handleKey(event, () => entryAction(label)) : undefined
