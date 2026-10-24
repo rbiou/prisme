@@ -237,7 +237,6 @@ export default function App() {
         state.game && state.role && state.locked ? (
           <GameScreen
             state={state}
-            settings={settings}
             onWave={match.sendWave}
             onCell={match.sendCell}
             onAnswer={match.answerIncoming}

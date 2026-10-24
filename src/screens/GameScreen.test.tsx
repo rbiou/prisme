@@ -4,7 +4,6 @@ import { entryForLabel } from '../engine/board';
 import { createGame } from '../engine/endgame';
 import type { GameState, Mine } from '../engine/types';
 import type { MatchState } from '../state/matchReducer';
-import { DEFAULT_SETTINGS } from '../state/settings';
 import { GameScreen } from './GameScreen';
 
 afterEach(cleanup);
@@ -54,7 +53,6 @@ function renderGame(game: GameState = createGame('host')) {
   render(
     <GameScreen
       state={createState(game)}
-      settings={DEFAULT_SETTINGS}
       onWave={onWave}
       onCell={onCell}
       onAnswer={onAnswer}
@@ -128,6 +126,18 @@ describe('GameScreen', () => {
           },
           createdAt: 1,
         },
+        {
+          id: 'scan-opponent',
+          by: 'guest',
+          kind: 'wave',
+          entry: entryForLabel('5'),
+          answer: {
+            kind: 'wave',
+            exit: entryForLabel('14') as NonNullable<ReturnType<typeof entryForLabel>>,
+            color: 'green',
+          },
+          createdAt: 2,
+        },
       ],
     };
     renderGame(game);
@@ -135,6 +145,34 @@ describe('GameScreen', () => {
     const asked = document.querySelectorAll('.board-entry.is-asked');
     expect(asked).toHaveLength(1);
     expect(asked[0]?.textContent).toContain('3');
+    expect(asked[0]?.textContent).not.toContain('5');
+  });
+
+  it('simule un rayon depuis une réponse du journal', () => {
+    const game: GameState = {
+      ...createGame('host'),
+      scans: [
+        {
+          id: 'scan-sim',
+          by: 'host',
+          kind: 'wave',
+          entry: entryForLabel('3'),
+          answer: {
+            kind: 'wave',
+            exit: entryForLabel('12') as NonNullable<ReturnType<typeof entryForLabel>>,
+            color: 'orange',
+          },
+          createdAt: 1,
+        },
+      ],
+    };
+    renderGame(game);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Simuler ce rayon' }));
+
+    expect(screen.getByText('Contredit la réponse')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Masquer' }));
+    expect(screen.queryByText('Contredit la réponse')).not.toBeInTheDocument();
   });
 
   it('affiche la table des mélanges de couleurs', () => {

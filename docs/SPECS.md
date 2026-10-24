@@ -102,10 +102,10 @@ Quand l'adversaire répond à une question ou à une confirmation, une notificat
 discrète apparaît en surimpression de l'écran et disparaît seule après quelques
 secondes. Elle rappelle la question et le résultat reçu sans interrompre le jeu.
 
-Les étiquettes de bord déjà utilisées dans le journal public sont grisées sur le
-plateau de prospection, pour éviter de rejouer un rayon déjà connu. Le panneau
-**Repères de couleur** rappelle les seize mélanges, comme dans les règles
-(rouge + bleu + jaune + blanc = gris, par exemple).
+Chaque joueur voit grisées les étiquettes de bord qu'il a lui-même déjà
+demandées dans le journal ; les demandes de l'adversaire ne grisent pas sa
+propre grille. Le panneau **Repères de couleur** rappelle les seize mélanges,
+comme dans les règles (rouge + bleu + jaune + blanc = gris, par exemple).
 
 #### Tir de rayon
 
@@ -143,9 +143,10 @@ plateau de prospection, pour éviter de rejouer un rayon déjà connu. Le pannea
   case ; le toucher à nouveau avec la même couleur le retire.
 - La saisie par coordonnées d'ancrage n'est pas proposée dans les notes ; le
   plateau se manipule directement.
-- **Simuler un rayon** : choisir une entrée, voir la trajectoire et le résultat
-  calculés sur les notes. Comparer avec les réponses enregistrées ; les
-  incohérences sont signalées.
+- **Simuler un rayon** : chaque réponse de rayon du journal demandée par le
+  joueur propose **Simuler ce rayon**. La simulation utilise les notes actuelles,
+  affiche sa trajectoire sur le plateau et indique si elle est cohérente avec la
+  réponse enregistrée. Un bouton **Masquer** retire la trajectoire.
 - Les notes ne sont jamais transmises pendant la partie ; seules les notes
   finales sont partagées à la fin pour expliquer le raisonnement.
 

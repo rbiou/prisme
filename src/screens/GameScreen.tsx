@@ -4,7 +4,7 @@ import { ColorChip } from '../components/ColorChip';
 import { ColorMixLegend } from '../components/ColorMixLegend';
 import { Dialog } from '../components/Dialog';
 import { MineComposer, type NoteTool } from '../components/MineComposer';
-import { ALL_ENTRIES, cellLabel, isCell, parseCellLabel, sideLabel } from '../engine/board';
+import { cellLabel, isCell, parseCellLabel, sideLabel } from '../engine/board';
 import { scanCell } from '../engine/cellScan';
 import { isColorMark, type ColorMark } from '../engine/colorMarks';
 import { canScan, canSubmit } from '../engine/endgame';
@@ -30,12 +30,10 @@ import type {
 } from '../engine/types';
 import { fr } from '../i18n/fr';
 import type { MatchState } from '../state/matchReducer';
-import type { Settings } from '../state/settings';
 import { ResultScreen } from './ResultScreen';
 
 export interface GameScreenProps {
   state: MatchState;
-  settings: Settings;
   onWave: (label: string) => boolean;
   onCell: (cell: Cell) => boolean;
   onAnswer: () => boolean;
@@ -122,12 +120,22 @@ function privateRayLabel(result: RayResult): string {
   return `Sortie ${result.exit?.label ?? '?'}`;
 }
 
+interface ActiveSimulation {
+  scanId: string;
+  entryLabel: string;
+  result: RayResult;
+  matches: boolean;
+}
+
 interface JournalProps {
   scans: ScanRecord[];
   role: PlayerId;
   opponentName: string;
   canRequestConfirmation: boolean;
   onRequestConfirmation: (answerId: string) => void;
+  simulation: ActiveSimulation | null;
+  onSimulate: (scan: ScanRecord) => void;
+  onClearSimulation: () => void;
 }
 
 function GameJournal({
@@ -136,6 +144,9 @@ function GameJournal({
   opponentName,
   canRequestConfirmation,
   onRequestConfirmation,
+  simulation,
+  onSimulate,
+  onClearSimulation,
 }: JournalProps) {
   if (scans.length === 0) {
     return <p className="empty-state">{fr.game.emptyJournal}</p>;
@@ -174,6 +185,30 @@ function GameJournal({
                   />
                 )}
               </div>
+              {byMe && scan.kind === 'wave' && scan.entry && scan.answer.kind === 'wave' ? (
+                <div className="journal-simulation">
+                  <button type="button" className="text-link" onClick={() => onSimulate(scan)}>
+                    {simulation?.scanId === scan.id ? 'Relancer la simulation' : 'Simuler ce rayon'}
+                  </button>
+                  {simulation?.scanId === scan.id ? (
+                    <div
+                      className={`simulation-inline${simulation.matches ? '' : ' is-mismatch'}`}
+                      role="status"
+                    >
+                      <span>
+                        {privateRayLabel(simulation.result)} ·{' '}
+                        {RAY_COLOR_LABELS[simulation.result.color]}
+                      </span>
+                      <strong>
+                        {simulation.matches ? 'Cohérente avec la réponse' : 'Contredit la réponse'}
+                      </strong>
+                      <button type="button" className="text-link" onClick={onClearSimulation}>
+                        Masquer
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               {byMe && !isConfirmation && canRequestConfirmation ? (
                 <button
                   type="button"
@@ -217,7 +252,6 @@ function PrivateBoard({
 
 export function GameScreen({
   state,
-  settings,
   onWave,
   onCell,
   onAnswer,
@@ -245,10 +279,7 @@ export function GameScreen({
   const [crosses, setCrosses] = useState<Cell[]>(() => loadCrosses(crossesKey));
   const [edgeMarks, setEdgeMarks] = useState<NoteEdgeMark[]>(() => loadEdgeMarks(edgesKey));
   const [colorMarks, setColorMarks] = useState<ColorMark[]>(() => loadColorMarks(dotsKey));
-  const [simulation, setSimulation] = useState<{ entryLabel: string; result: RayResult } | null>(
-    null,
-  );
-  const [simEntry, setSimEntry] = useState('1');
+  const [simulation, setSimulation] = useState<ActiveSimulation | null>(null);
   const [cellInput, setCellInput] = useState('');
   const [cellError, setCellError] = useState<string | null>(null);
   const [submitOpen, setSubmitOpen] = useState(false);
@@ -287,10 +318,6 @@ export function GameScreen({
     }
   }, [colorMarks, dotsKey]);
 
-  const notesSimulationValidation = useMemo(
-    () => validateMine(notes, { enforceWhiteSymmetry: settings.enforceWhiteSymmetry }),
-    [notes, settings.enforceWhiteSymmetry],
-  );
   const notesStructureValidation = useMemo(
     () =>
       validateMine(notes, {
@@ -311,14 +338,16 @@ export function GameScreen({
   const canScanNow = canScan(game, role) && connected;
   const canSubmitNow = canSubmit(game, role) && connected;
   const submitToolReady = tool === 'scan';
+  // Chaque joueur ne grise que les entrées qu’il a lui-même demandées.
   const askedEntries = useMemo(
     () =>
       new Set(
         game.scans
+          .filter((scan) => scan.by === role)
           .map((scan) => scan.entry?.label)
           .filter((label): label is string => Boolean(label)),
       ),
-    [game.scans],
+    [game.scans, role],
   );
   const incomingScan = game.pendingScan && game.pendingScan.by !== role ? game.pendingScan : null;
   const incomingConfirmation =
@@ -369,29 +398,6 @@ export function GameScreen({
     () => (incomingSubmission ? checkSolution(incomingSubmission.candidate, myMine) : null),
     [incomingSubmission, myMine],
   );
-
-  const matchingAnswer = useMemo(() => {
-    if (!simulation) return null;
-    return (
-      [...game.scans]
-        .reverse()
-        .find(
-          (scan) =>
-            scan.kind === 'wave' &&
-            scan.entry?.label === simulation.entryLabel &&
-            !scan.confirmationOf,
-        ) ?? null
-    );
-  }, [game.scans, simulation]);
-
-  const simulationMatches = useMemo(() => {
-    if (!simulation || !matchingAnswer || matchingAnswer.answer.kind !== 'wave') return null;
-    if (simulation.result.status === 'loop') return false;
-    return (
-      simulation.result.exit?.label === matchingAnswer.answer.exit.label &&
-      simulation.result.color === matchingAnswer.answer.color
-    );
-  }, [matchingAnswer, simulation]);
 
   const turnLabel = (() => {
     if (game.phase === 'awaiting-verification') {
@@ -444,10 +450,19 @@ export function GameScreen({
     }
   }
 
-  function runSimulation() {
-    const entry = ALL_ENTRIES.find((candidate) => candidate.label === simEntry);
-    if (!entry) return;
-    setSimulation({ entryLabel: entry.label, result: simulateRay(notes, entry) });
+  function simulateScan(scan: ScanRecord) {
+    if (scan.kind !== 'wave' || !scan.entry || scan.answer.kind !== 'wave') return;
+    const result = simulateRay(notes, scan.entry);
+    const matches =
+      result.status !== 'loop' &&
+      result.exit?.label === scan.answer.exit.label &&
+      result.color === scan.answer.color;
+    setSimulation({
+      scanId: scan.id,
+      entryLabel: scan.entry.label,
+      result,
+      matches,
+    });
   }
 
   function confirmSubmission() {
@@ -629,86 +644,6 @@ export function GameScreen({
                   {cellError}
                 </p>
               ) : null}
-              <div className="simulation-card">
-                <div className="simulation-heading">
-                  <h3>{fr.game.simulate}</h3>
-                  {simulation ? (
-                    <span
-                      className={`badge ${simulationMatches === false ? 'badge--danger' : 'badge--soft'}`}
-                    >
-                      {simulation.result.status === 'loop'
-                        ? 'Boucle'
-                        : `${privateRayLabel(simulation.result)} · ${RAY_COLOR_LABELS[simulation.result.color]}`}
-                    </span>
-                  ) : null}
-                </div>
-                <div className="simulation-controls">
-                  <label className="field field--inline">
-                    <span>{fr.game.rayLabel}</span>
-                    <select value={simEntry} onChange={(event) => setSimEntry(event.target.value)}>
-                      <optgroup label="Haut">
-                        {ALL_ENTRIES.filter((entry) => entry.side === 'top').map((entry) => (
-                          <option key={entry.label} value={entry.label}>
-                            {entry.label}
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Droite">
-                        {ALL_ENTRIES.filter((entry) => entry.side === 'right').map((entry) => (
-                          <option key={entry.label} value={entry.label}>
-                            {entry.label}
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Bas">
-                        {ALL_ENTRIES.filter((entry) => entry.side === 'bottom').map((entry) => (
-                          <option key={entry.label} value={entry.label}>
-                            {entry.label}
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Gauche">
-                        {ALL_ENTRIES.filter((entry) => entry.side === 'left').map((entry) => (
-                          <option key={entry.label} value={entry.label}>
-                            {entry.label}
-                          </option>
-                        ))}
-                      </optgroup>
-                    </select>
-                  </label>
-                  <button
-                    type="button"
-                    className="btn btn--secondary"
-                    onClick={runSimulation}
-                    disabled={!notesSimulationValidation.ok}
-                  >
-                    Simuler
-                  </button>
-                </div>
-                {!notesSimulationValidation.ok ? (
-                  <p className="hint">{fr.game.simulationIncomplete}</p>
-                ) : null}
-                {matchingAnswer && matchingAnswer.answer.kind === 'wave' ? (
-                  <div
-                    className={`simulation-compare${simulationMatches === false ? ' is-mismatch' : ''}`}
-                  >
-                    <span>
-                      Réponse confirmée pour l’entrée {simulation?.entryLabel} : sortie{' '}
-                      {matchingAnswer.answer.exit.label},{' '}
-                      <ColorChip color={matchingAnswer.answer.color} size="small" />
-                    </span>
-                    {simulationMatches === false ? (
-                      <strong>Votre simulation contredit cette réponse.</strong>
-                    ) : (
-                      <strong>Simulation cohérente avec le journal.</strong>
-                    )}
-                  </div>
-                ) : simulation ? (
-                  <p className="hint">
-                    Aucune réponse confirmée pour l’entrée {simulation.entryLabel}.
-                  </p>
-                ) : null}
-              </div>
             </>
           </section>
 
@@ -765,6 +700,9 @@ export function GameScreen({
                 onRequestConfirmation={(answerId) => {
                   onRequestConfirmation(answerId);
                 }}
+                simulation={simulation}
+                onSimulate={simulateScan}
+                onClearSimulation={() => setSimulation(null)}
               />
             </section>
 

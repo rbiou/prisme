@@ -1887,6 +1887,46 @@ input[type='checkbox'] {
   font-size: 0.74rem;
 }
 
+.journal-simulation {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.journal-simulation > .text-link {
+  justify-self: start;
+}
+
+.simulation-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  background: rgba(103, 232, 249, 0.07);
+  border: 1px solid rgba(103, 232, 249, 0.18);
+  border-radius: 8px;
+}
+
+.simulation-inline strong {
+  color: var(--green);
+}
+
+.simulation-inline.is-mismatch {
+  background: rgba(251, 113, 133, 0.08);
+  border-color: rgba(251, 113, 133, 0.25);
+}
+
+.simulation-inline.is-mismatch strong {
+  color: var(--red);
+}
+
+.simulation-inline .text-link {
+  margin-left: auto;
+}
+
 .color-legend {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
