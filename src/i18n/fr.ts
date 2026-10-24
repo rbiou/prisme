@@ -44,6 +44,12 @@ export const fr = {
     board: 'Plateau de votre mine',
     selected: 'Pièce sélectionnée',
     placeHint: 'Touchez une intersection du plateau pour placer ou déplacer la pièce.',
+    notesTool: 'Outil des notes privées',
+    pieceTool: 'Gemmes',
+    crossTool: 'Croix',
+    crossHint:
+      'Touchez une case pour la marquer comme vide, ou touchez à nouveau pour retirer la croix.',
+    clearCrosses: 'Effacer les croix',
     coordinateLabel: 'Coordonnées d’ancrage',
     coordinatePlaceholder: 'E4',
     placeAt: 'Placer',

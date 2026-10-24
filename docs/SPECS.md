@@ -90,6 +90,10 @@ Deux onglets principaux :
 Bandeau de tour permanent : « À vous de prospecter », « Au tour de
 l'adversaire », « Réponse en attente de confirmation », « Dernier tour ».
 
+Quand l'adversaire répond à une question ou à une confirmation, une notification
+discrète apparaît en surimpression de l'écran et disparaît seule après quelques
+secondes. Elle rappelle la question et le résultat reçu sans interrompre le jeu.
+
 #### Tir de rayon
 
 - Le prospecteur touche une étiquette de bord (`1`–`18`, `A`–`R`).
@@ -113,6 +117,8 @@ l'adversaire », « Réponse en attente de confirmation », « Dernier tour ».
 - Placement, rotation, déplacement et suppression sur un calque privé.
 - Les notes peuvent être incomplètes ; la simulation n'est proposée que
   lorsqu'elles forment une mine valide.
+- Un outil **Croix** permet de marquer les cases dont on sait qu'elles sont
+  vides. Ces marques restent locales et peuvent être effacées séparément.
 - **Simuler un rayon** : choisir une entrée, voir la trajectoire et le résultat
   calculés sur les notes. Comparer avec les réponses enregistrées ; les
   incohérences sont signalées.

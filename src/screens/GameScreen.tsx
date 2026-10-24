@@ -3,7 +3,7 @@ import { Board } from '../components/Board';
 import { ColorChip } from '../components/ColorChip';
 import { Dialog } from '../components/Dialog';
 import { MineComposer } from '../components/MineComposer';
-import { ALL_ENTRIES, cellLabel, parseCellLabel, sideLabel } from '../engine/board';
+import { ALL_ENTRIES, cellLabel, isCell, parseCellLabel, sideLabel } from '../engine/board';
 import { scanCell } from '../engine/cellScan';
 import { canScan, canSubmit } from '../engine/endgame';
 import { checkSolution, deserializeMine, isSerializedMine, serializeMine } from '../engine/mine';
@@ -48,6 +48,28 @@ function loadNotes(key: string): Mine {
     return isSerializedMine(parsed) ? deserializeMine(parsed) : { version: 1, pieces: [] };
   } catch {
     return { version: 1, pieces: [] };
+  }
+}
+
+function isStoredCell(value: unknown): value is Cell {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as { col?: unknown; row?: unknown };
+  return (
+    typeof candidate.col === 'number' &&
+    typeof candidate.row === 'number' &&
+    isCell({ col: candidate.col, row: candidate.row })
+  );
+}
+
+function loadCrosses(key: string): Cell[] {
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isStoredCell);
+  } catch {
+    return [];
   }
 }
 
@@ -179,9 +201,11 @@ export function GameScreen({
   const locked = state.locked!;
   const myMine = locked.mine;
   const notesKey = `prisme:notes:${state.readyAt ?? 'local'}`;
+  const crossesKey = `prisme:crosses:${state.readyAt ?? 'local'}`;
   const [tab, setTab] = useState<'prospection' | 'mine'>('prospection');
   const [mode, setMode] = useState<'scan' | 'notes'>('scan');
   const [notes, setNotes] = useState<Mine>(() => loadNotes(notesKey));
+  const [crosses, setCrosses] = useState<Cell[]>(() => loadCrosses(crossesKey));
   const [simulation, setSimulation] = useState<{ entryLabel: string; result: RayResult } | null>(
     null,
   );
@@ -199,6 +223,14 @@ export function GameScreen({
       // Les notes restent en mémoire si le stockage est indisponible.
     }
   }, [notes, notesKey]);
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(crossesKey, JSON.stringify(crosses));
+    } catch {
+      // Les croix restent en mémoire si le stockage est indisponible.
+    }
+  }, [crosses, crossesKey]);
 
   const notesSimulationValidation = useMemo(
     () => validateMine(notes, { enforceWhiteSymmetry: settings.enforceWhiteSymmetry }),
@@ -514,6 +546,8 @@ export function GameScreen({
                 <MineComposer
                   mine={notes}
                   onChange={updateNotes}
+                  crosses={crosses}
+                  onCrossesChange={setCrosses}
                   boardAriaLabel="Plateau de notes privées"
                   path={simulation?.result.path ?? null}
                   pathColor={simulation?.result.color ?? 'white'}

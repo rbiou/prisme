@@ -21,6 +21,7 @@ function createState(game: GameState): MatchState {
     transportStatus: 'connected',
     warning: null,
     error: null,
+    notice: null,
     locked: {
       mine: EMPTY_MINE,
       salt: '0'.repeat(32),

@@ -1049,6 +1049,14 @@ input[type='checkbox'] {
   gap: 6px;
 }
 
+.composer-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .board-frame {
   width: 100%;
   padding: 8px;
@@ -1114,6 +1122,12 @@ input[type='checkbox'] {
   stroke: rgba(103, 232, 249, 0.62);
   stroke-width: 0.03px;
   stroke-dasharray: 0.11 0.08;
+}
+
+.board-crosses line {
+  stroke: rgba(148, 190, 235, 0.55);
+  stroke-width: 0.06px;
+  stroke-linecap: round;
 }
 
 .board-gem polygon {
@@ -1221,12 +1235,28 @@ input[type='checkbox'] {
   animation: slide-up 220ms ease both;
 }
 
+.toast--info {
+  border-left-color: var(--cyan);
+}
+
 .toast--warning {
   border-left-color: var(--amber);
 }
 
 .toast--error {
   border-left-color: var(--red);
+}
+
+.toast-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.toast-body strong {
+  color: #d8fbff;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
 }
 
 /* Status panels, connection */

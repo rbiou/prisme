@@ -35,6 +35,7 @@ export interface UseMatchResult {
   submitCandidate: (candidate: SerializedMine) => boolean;
   clearWarning: () => void;
   clearError: () => void;
+  clearNotice: () => void;
 }
 
 const DRAFT_KEY = 'prisme:mine-draft';
@@ -553,6 +554,21 @@ export function useMatch(settings: Settings): UseMatchResult {
 
   const clearWarning = useCallback(() => dispatch({ type: 'clear-warning' }), []);
   const clearError = useCallback(() => dispatch({ type: 'clear-error' }), []);
+  const clearNotice = useCallback(() => {
+    const notice = stateRef.current.notice;
+    if (!notice) return;
+    dispatch({ type: 'clear-notice', id: notice.id });
+  }, []);
+
+  // Les notifications de réponse disparaissent seules, sans bloquer le jeu.
+  useEffect(() => {
+    const notice = state.notice;
+    if (!notice) return;
+    const timer = window.setTimeout(() => {
+      dispatch({ type: 'clear-notice', id: notice.id });
+    }, 9_000);
+    return () => window.clearTimeout(timer);
+  }, [state.notice]);
 
   // Révélation automatique à la fin, avec quelques tentatives si le canal
   // n'est pas encore prêt.
@@ -633,6 +649,7 @@ export function useMatch(settings: Settings): UseMatchResult {
     submitCandidate,
     clearWarning,
     clearError,
+    clearNotice,
   };
 }
 

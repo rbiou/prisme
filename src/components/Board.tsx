@@ -23,6 +23,7 @@ const GEM_FILL: Record<GemColor, string> = {
 export interface BoardProps {
   mine?: Mine;
   notes?: Mine;
+  crosses?: Cell[] | null;
   onCellAction?: (cell: Cell) => void;
   onEntryAction?: (label: string) => void;
   interactiveCells?: boolean;
@@ -84,6 +85,7 @@ function PatternDefs() {
 export function Board({
   mine,
   notes,
+  crosses = null,
   onCellAction,
   onEntryAction,
   interactiveCells = false,
@@ -161,6 +163,27 @@ export function Board({
             />
           ))
         : null}
+
+      {crosses && crosses.length > 0 ? (
+        <g className="board-crosses" aria-hidden="true">
+          {crosses.map((cell) => (
+            <g key={`cross-${cell.col}-${cell.row}`}>
+              <line
+                x1={cell.col + 0.24}
+                y1={cell.row + 0.24}
+                x2={cell.col + 0.76}
+                y2={cell.row + 0.76}
+              />
+              <line
+                x1={cell.col + 0.76}
+                y1={cell.row + 0.24}
+                x2={cell.col + 0.24}
+                y2={cell.row + 0.76}
+              />
+            </g>
+          ))}
+        </g>
+      ) : null}
 
       {mine?.pieces.map((piece) => (
         <g key={piece.id} className="board-gem" filter="url(#gem-glow)">

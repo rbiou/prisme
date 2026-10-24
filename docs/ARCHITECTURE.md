@@ -272,7 +272,8 @@ du canal de données sont la source des actions distantes.
 ### 6.2 État privé local
 
 - `localMine` : mine secrète verrouillée, sel, engagement.
-- `notes` : pièces candidates et marques locales.
+- `notes` : pièces candidates et croix sur les cases vides, conservées dans
+  `sessionStorage` et jamais transmises.
 - `settings` : options de règles et d'accessibilité.
 - `session` : rôle, code de salon, phase (salon, placement, attente, prête) et
   état de connexion.

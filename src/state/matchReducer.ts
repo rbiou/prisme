@@ -1,4 +1,5 @@
-import { entryForLabel } from '../engine/board';
+import { cellLabel, entryForLabel, sideLabel } from '../engine/board';
+import { GEM_COLOR_LABELS, RAY_COLOR_LABELS } from '../engine/colors';
 import {
   answerScan,
   beginSubmission,
@@ -11,7 +12,7 @@ import {
   type ScanAnswer,
   type ScanRequest,
 } from '../engine/endgame';
-import type { GameState, PlayerId, ScanRecord, SerializedMine } from '../engine/types';
+import type { Cell, GameState, PlayerId, ScanRecord, SerializedMine } from '../engine/types';
 import type { NetworkMessage } from '../net/protocol';
 import { PROTOCOL_VERSION } from '../net/protocol';
 import type { LobbyContext, ReadyContext, SessionPhase } from '../net/session';
@@ -29,6 +30,13 @@ export interface RevealRecord {
   receivedAt: number;
 }
 
+/** Notification éphémère affichée en surimpression de l’écran de partie. */
+export interface MatchNotice {
+  id: string;
+  title: string;
+  body: string;
+}
+
 export interface MatchState {
   role: PlayerId | null;
   playerName: string;
@@ -38,6 +46,7 @@ export interface MatchState {
   transportStatus: PeerStatus;
   warning: string | null;
   error: string | null;
+  notice: MatchNotice | null;
   locked: LockedMine | null;
   starter: PlayerId | null;
   opponentName: string;
@@ -57,6 +66,7 @@ export const initialMatchState: MatchState = {
   transportStatus: 'idle',
   warning: null,
   error: null,
+  notice: null,
   locked: null,
   starter: null,
   opponentName: 'Adversaire',
@@ -76,6 +86,8 @@ export type MatchAction =
   | { type: 'clear-warning' }
   | { type: 'error'; message: string }
   | { type: 'clear-error' }
+  | { type: 'notice'; notice: MatchNotice }
+  | { type: 'clear-notice'; id: string }
   | { type: 'mine-locked'; locked: LockedMine }
   | { type: 'room-code'; code: string }
   | { type: 'lobby'; context: LobbyContext }
@@ -110,6 +122,35 @@ function applyGameResult(
 
 function findOriginal(state: MatchState, answerId: string): ScanRecord | undefined {
   return state.game?.scans.find((scan) => scan.id === answerId);
+}
+
+function describeQuestion(question: {
+  kind: 'wave' | 'cell';
+  entryLabel?: string;
+  cell?: Cell;
+}): string {
+  if (question.kind === 'wave' && question.entryLabel) {
+    const entry = entryForLabel(question.entryLabel);
+    return `Rayon ${question.entryLabel}${entry ? ` · côté ${sideLabel(entry.side)}` : ''}`;
+  }
+  if (question.cell) return `Case ${cellLabel(question.cell)}`;
+  return 'Votre question';
+}
+
+function describeAnswer(answer: ScanAnswer): string {
+  if (answer.kind === 'wave') {
+    return `sortie ${answer.exit.label} · ${RAY_COLOR_LABELS[answer.color]}`;
+  }
+  return answer.color ? GEM_COLOR_LABELS[answer.color] : 'aucune gemme';
+}
+
+function answerNotice(
+  id: string,
+  title: string,
+  question: string,
+  answer: ScanAnswer,
+): MatchNotice {
+  return { id, title, body: `${question} : ${describeAnswer(answer)}.` };
 }
 
 function handleMessage(state: MatchState, message: NetworkMessage, now: number): MatchState {
@@ -152,7 +193,22 @@ function handleMessage(state: MatchState, message: NetworkMessage, now: number):
               color: message.color,
             }
           : { kind: 'cell', color: message.color };
-      return applyGameResult(state, answerScan(state.game, message.scanId, answer, now));
+      const pending = state.game.pendingScan;
+      const answered = applyGameResult(state, answerScan(state.game, message.scanId, answer, now));
+      if (!answered.game || answered.warning) return answered;
+      return {
+        ...answered,
+        notice: answerNotice(
+          message.id,
+          'Réponse reçue',
+          describeQuestion({
+            kind: pending?.kind ?? message.kind,
+            entryLabel: pending?.entry?.label,
+            cell: pending?.cell,
+          }),
+          answer,
+        ),
+      };
     }
     case 'cancel-scan':
       return applyGameResult(state, cancelScan(state.game, message.from));
@@ -184,7 +240,22 @@ function handleMessage(state: MatchState, message: NetworkMessage, now: number):
               color: message.color,
             }
           : { kind: 'cell', color: message.color };
-      return applyGameResult(state, resolveConfirmation(state.game, answer, now));
+      const original = findOriginal(state, message.answerId);
+      const resolved = applyGameResult(state, resolveConfirmation(state.game, answer, now));
+      if (!resolved.game || resolved.warning || !original) return resolved;
+      return {
+        ...resolved,
+        notice: answerNotice(
+          message.id,
+          'Confirmation reçue',
+          describeQuestion({
+            kind: original.kind,
+            entryLabel: original.entry?.label,
+            cell: original.cell,
+          }),
+          answer,
+        ),
+      };
     }
     case 'submit':
       return applyGameResult(
@@ -281,6 +352,11 @@ export function matchReducer(state: MatchState, action: MatchAction): MatchState
       return { ...state, error: action.message };
     case 'clear-error':
       return { ...state, error: null };
+    case 'notice':
+      return { ...state, notice: action.notice };
+    case 'clear-notice':
+      if (state.notice?.id !== action.id) return state;
+      return { ...state, notice: null };
     case 'mine-locked':
       return { ...state, locked: action.locked };
     case 'room-code':

@@ -262,6 +262,22 @@ export default function App() {
       ) : null}
 
       <div className="toast-stack" aria-live="polite">
+        {state.notice ? (
+          <div className="toast toast--info" role="status">
+            <div className="toast-body">
+              <strong>{state.notice.title}</strong>
+              <span>{state.notice.body}</span>
+            </div>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={match.clearNotice}
+              aria-label="Masquer la notification"
+            >
+              ×
+            </button>
+          </div>
+        ) : null}
         {state.warning ? (
           <div className="toast toast--warning" role="status">
             <span>{state.warning}</span>

@@ -63,6 +63,9 @@ export interface MineComposerProps {
   onSelectedKindChange?: (kind: PieceKind) => void;
   path?: Point[] | null;
   pathColor?: RayColor;
+  /** Cases marquées comme vides dans les notes privées. */
+  crosses?: Cell[];
+  onCrossesChange?: (cells: Cell[]) => void;
 }
 
 export function MineComposer({
@@ -74,14 +77,18 @@ export function MineComposer({
   onSelectedKindChange,
   path = null,
   pathColor = 'white',
+  crosses = [],
+  onCrossesChange,
 }: MineComposerProps) {
   const [internalKind, setInternalKind] = useState<PieceKind>('red-parallelogram');
   const [rotation, setRotation] = useState<Rotation>(0);
   const [message, setMessage] = useState<string | null>(null);
   const [coordinate, setCoordinate] = useState('');
+  const [tool, setTool] = useState<'piece' | 'cross'>('piece');
 
   const activeKind = selectedKind ?? internalKind;
   const placed = mine.pieces.find((piece) => piece.kind === activeKind);
+  const crossMode = Boolean(onCrossesChange) && tool === 'cross';
 
   function selectKind(kind: PieceKind) {
     if (disabled) return;
@@ -101,7 +108,30 @@ export function MineComposer({
       return;
     }
     onChange(upsertPiece(mine, candidate));
+    // La case n’est plus vide : une croix éventuelle n’a plus de sens.
+    if (onCrossesChange && crosses.some((item) => item.col === cell.col && item.row === cell.row)) {
+      onCrossesChange(crosses.filter((item) => !(item.col === cell.col && item.row === cell.row)));
+    }
     setMessage(null);
+  }
+
+  function toggleCross(cell: Cell) {
+    if (disabled || !onCrossesChange) return;
+    const exists = crosses.some((item) => item.col === cell.col && item.row === cell.row);
+    onCrossesChange(
+      exists
+        ? crosses.filter((item) => !(item.col === cell.col && item.row === cell.row))
+        : [...crosses, cell],
+    );
+    setMessage(null);
+  }
+
+  function handleCell(cell: Cell) {
+    if (crossMode) {
+      toggleCross(cell);
+      return;
+    }
+    placeAt(cell);
   }
 
   function rotate() {
@@ -122,6 +152,7 @@ export function MineComposer({
   function clear() {
     if (disabled) return;
     onChange({ version: 1, pieces: [] });
+    onCrossesChange?.([]);
     setRotation(0);
     setMessage(null);
   }
@@ -196,10 +227,46 @@ export function MineComposer({
         </div>
       </div>
 
+      {onCrossesChange ? (
+        <div className="composer-tools">
+          <div className="mode-switch" role="group" aria-label={fr.placement.notesTool}>
+            <button
+              type="button"
+              className={`mode-button${tool === 'piece' ? ' is-active' : ''}`}
+              aria-pressed={tool === 'piece'}
+              onClick={() => setTool('piece')}
+              disabled={disabled}
+            >
+              {fr.placement.pieceTool}
+            </button>
+            <button
+              type="button"
+              className={`mode-button${tool === 'cross' ? ' is-active' : ''}`}
+              aria-pressed={tool === 'cross'}
+              onClick={() => setTool('cross')}
+              disabled={disabled}
+            >
+              {fr.placement.crossTool}
+            </button>
+          </div>
+          {crosses.length > 0 ? (
+            <button
+              type="button"
+              className="btn btn--ghost btn--small"
+              onClick={() => onCrossesChange([])}
+              disabled={disabled}
+            >
+              {fr.placement.clearCrosses}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="board-frame">
         <Board
           mine={mine}
-          onCellAction={disabled ? undefined : placeAt}
+          crosses={crosses}
+          onCellAction={disabled ? undefined : handleCell}
           interactiveCells={!disabled}
           ariaLabel={boardAriaLabel ?? fr.placement.board}
           path={path}
@@ -237,7 +304,7 @@ export function MineComposer({
         </button>
       </div>
 
-      <p className="hint">{fr.placement.placeHint}</p>
+      <p className="hint">{crossMode ? fr.placement.crossHint : fr.placement.placeHint}</p>
       {message ? (
         <p className="inline-alert" role="status">
           {message}
