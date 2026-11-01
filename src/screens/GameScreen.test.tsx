@@ -175,6 +175,33 @@ describe('GameScreen', () => {
     expect(screen.queryByText('Contredit la réponse')).not.toBeInTheDocument();
   });
 
+  it('affiche immédiatement une gemme posée dans les notes privées', () => {
+    renderGame();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Gemmes' }));
+    const cell = document.querySelectorAll('.board-cell-hit')[4 * 10 + 5] as Element;
+    fireEvent.pointerDown(cell, { pointerId: 1 });
+    fireEvent.pointerUp(cell, { pointerId: 1 });
+
+    expect(document.querySelectorAll('.board-gem')).toHaveLength(1);
+    expect(document.querySelector('.board-ghost')).toBeNull();
+  });
+
+  it('sonde une case couverte par une gemme de note', () => {
+    const { onCell } = renderGame();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Gemmes' }));
+    const cell = document.querySelectorAll('.board-cell-hit')[4 * 10 + 5] as Element;
+    fireEvent.pointerDown(cell, { pointerId: 2 });
+    fireEvent.pointerUp(cell, { pointerId: 2 });
+    fireEvent.click(screen.getByRole('button', { name: 'Sonder' }));
+
+    const gem = document.querySelector('.board-gem polygon') as Element;
+    fireEvent.click(gem);
+
+    expect(onCell).toHaveBeenCalledWith({ col: 4, row: 4 });
+  });
+
   it('affiche la table des mélanges de couleurs', () => {
     renderGame();
 

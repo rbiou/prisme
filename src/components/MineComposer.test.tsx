@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { NoteEdgeMark } from '../engine/noteEdges';
+import { createPiece } from '../engine/pieces';
 import type { Cell, Mine } from '../engine/types';
 import { MineComposer } from './MineComposer';
 
@@ -42,6 +43,91 @@ function renderEdgeComposer(edgeMarks: NoteEdgeMark[] = [], crosses: Cell[] = []
 function boardCells(): Element[] {
   return Array.from(document.querySelectorAll('.board-cell-hit'));
 }
+
+describe('MineComposer — placement fluide des gemmes', () => {
+  it('pose une gemme centrée sous le doigt', () => {
+    const onChange = vi.fn();
+    render(<MineComposer mine={EMPTY_MINE} onChange={onChange} />);
+
+    const cell = boardCells()[4 * 10 + 5] as Element;
+    fireEvent.pointerDown(cell, { pointerId: 1 });
+    fireEvent.pointerUp(cell, { pointerId: 1 });
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0]?.[0] as Mine;
+    expect(next.pieces[0]).toMatchObject({
+      kind: 'red-parallelogram',
+      rotation: 0,
+      x: 4,
+      y: 4,
+    });
+  });
+
+  it('déplace une gemme en la faisant glisser', () => {
+    const onChange = vi.fn();
+    const mine: Mine = {
+      version: 1,
+      pieces: [createPiece('red-parallelogram', 0, 4, 4)],
+    };
+    render(<MineComposer mine={mine} onChange={onChange} />);
+
+    const gem = document.querySelector('.board-gem polygon') as Element;
+    const target = boardCells()[2 * 10 + 2] as Element;
+    fireEvent.pointerDown(gem, { pointerId: 2 });
+    fireEvent.pointerMove(target, { pointerId: 2 });
+    fireEvent.pointerUp(target, { pointerId: 2 });
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0]?.[0] as Mine;
+    expect(next.pieces[0]).toMatchObject({ kind: 'red-parallelogram', x: 2, y: 2 });
+  });
+
+  it('ne déplace pas une gemme sur un simple appui', () => {
+    const onChange = vi.fn();
+    const mine: Mine = {
+      version: 1,
+      pieces: [createPiece('red-parallelogram', 0, 4, 4)],
+    };
+    render(<MineComposer mine={mine} onChange={onChange} />);
+
+    const gem = document.querySelector('.board-gem polygon') as Element;
+    fireEvent.pointerDown(gem, { pointerId: 3 });
+    fireEvent.pointerUp(gem, { pointerId: 3 });
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('retire les croix recouvertes par la gemme posée', () => {
+    const onChange = vi.fn();
+    const onCrossesChange = vi.fn();
+    render(
+      <MineComposer
+        mine={EMPTY_MINE}
+        onChange={onChange}
+        crosses={[{ col: 5, row: 4 }]}
+        onCrossesChange={onCrossesChange}
+      />,
+    );
+
+    const cell = boardCells()[4 * 10 + 5] as Element;
+    fireEvent.pointerDown(cell, { pointerId: 4 });
+    fireEvent.pointerUp(cell, { pointerId: 4 });
+
+    expect(onCrossesChange).toHaveBeenCalledWith([]);
+  });
+
+  it('ne pose qu’une gemme malgré le clic qui suit l’appui', () => {
+    const onChange = vi.fn();
+    render(<MineComposer mine={EMPTY_MINE} onChange={onChange} />);
+
+    const cell = boardCells()[4 * 10 + 5] as Element;
+    fireEvent.pointerDown(cell, { pointerId: 5 });
+    fireEvent.pointerUp(cell, { pointerId: 5 });
+    fireEvent.click(cell, { detail: 1 });
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('MineComposer — croix des notes privées', () => {
   it('ajoute une croix dans la case touchée en mode croix', () => {

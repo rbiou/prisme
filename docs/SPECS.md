@@ -81,6 +81,15 @@ fois la mine valide, **Verrouiller ma mine** calcule l'engagement SHA-256 et
 l'envoie à l'adversaire. L'écran d'attente affiche le nom de l'adversaire
 jusqu'au démarrage.
 
+Le placement se fait directement sur le plateau : un appui pose la gemme
+choisie, centrée sous le doigt, et un glissement permet de l'ajuster avant de
+relâcher. Une gemme déjà posée se déplace de la même façon. Pendant le geste,
+un fantôme vert indique une position valide et un fantôme rouge une position
+occupée ou en contact bord à bord ; la gemme est ramenée dans le plateau et se
+cale sur la position valide la plus proche lorsqu'elle existe. La rotation, la
+suppression et la saisie de coordonnées restent disponibles pour le clavier et
+les ajustements fins.
+
 ### 5.5 Partie
 
 Deux onglets principaux :
@@ -127,7 +136,10 @@ comme dans les règles (rouge + bleu + jaune + blanc = gris, par exemple).
 #### Notes et simulation
 
 - Palette des cinq pièces candidates.
-- Placement, rotation, déplacement et suppression sur un calque privé.
+- Placement, rotation, déplacement et suppression sur un calque privé. La gemme
+  apparaît centrée sous le doigt ; un glissement l'ajuste, et une gemme déjà
+  posée se déplace en la faisant glisser. Un fantôme vert ou rouge indique si
+  la position est valide.
 - Les notes peuvent être incomplètes ; la simulation n'est proposée que
   lorsqu'elles forment une mine valide.
 - Un outil **Croix** permet de marquer les cases dont on sait qu'elles sont

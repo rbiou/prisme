@@ -1,4 +1,8 @@
-import { useState } from 'react';
+import {
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { cellLabel, parseCellLabel } from '../engine/board';
 import { colorMarkAt, upsertColorMark, type ColorMark } from '../engine/colorMarks';
 import { GEM_COLORS, GEM_COLOR_LABELS } from '../engine/colors';
@@ -9,11 +13,27 @@ import {
   colorForKind,
   createPiece,
   labelForKind,
-  pieceBoundingBox,
   shapeFor,
 } from '../engine/pieces';
+import {
+  canPlacePiece,
+  cellsTouchedByPiece,
+  clampOrigin,
+  nearestValidOrigin,
+  originForPoint,
+  type PieceOrigin,
+} from '../engine/pointerPlacement';
 import { removePiece, upsertPiece } from '../engine/mine';
-import type { Cell, GemColor, Mine, PieceKind, Point, RayColor, Rotation } from '../engine/types';
+import type {
+  Cell,
+  GemColor,
+  Mine,
+  PieceKind,
+  PlacedPiece,
+  Point,
+  RayColor,
+  Rotation,
+} from '../engine/types';
 import { Board } from './Board';
 import { fr } from '../i18n/fr';
 
@@ -66,6 +86,16 @@ export function GemPreview({
 }
 
 export type NoteTool = 'scan' | 'piece' | 'cross' | 'edge' | 'dot';
+
+interface DragState {
+  kind: PieceKind;
+  rotation: Rotation;
+  origin: 'new' | 'existing';
+  start: Point;
+  anchor: PieceOrigin;
+  grabOffset: Point;
+  moved: boolean;
+}
 
 export interface MineComposerProps {
   mine: Mine;
@@ -126,9 +156,13 @@ export function MineComposer({
   const [internalTool, setInternalTool] = useState<NoteTool>(onScanCell ? 'scan' : 'piece');
   const [edgeSide, setEdgeSide] = useState<CellEdgeSide>('top');
   const [markColor, setMarkColor] = useState<GemColor>('red');
+  const [drag, setDrag] = useState<DragState | null>(null);
+  const [hover, setHover] = useState<PieceOrigin | null>(null);
 
   const tool = controlledTool ?? internalTool;
   function changeTool(next: NoteTool) {
+    setDrag(null);
+    setHover(null);
     setInternalTool(next);
     onToolChange?.(next);
   }
@@ -150,25 +184,137 @@ export function MineComposer({
     setMessage(null);
   }
 
-  function placeAt(cell: Cell) {
-    if (disabled) return;
-    const candidate = createPiece(activeKind, rotation, cell.col, cell.row);
-    const box = pieceBoundingBox(candidate);
-    if (box.minX < 0 || box.minY < 0 || box.maxX > 10 || box.maxY > 8) {
-      setMessage('La pièce dépasse du plateau depuis cette position.');
-      return;
+  function removeMarksUnder(piece: PlacedPiece) {
+    const cells = cellsTouchedByPiece(piece);
+    const touched = (cell: Cell) =>
+      cells.some((item) => item.col === cell.col && item.row === cell.row);
+    if (onCrossesChange) {
+      const remaining = crosses.filter((cell) => !touched(cell));
+      if (remaining.length !== crosses.length) onCrossesChange(remaining);
+    }
+    if (onColorMarksChange) {
+      const remaining = colorMarks.filter((mark) => !touched(mark.cell));
+      if (remaining.length !== colorMarks.length) onColorMarksChange(remaining);
+    }
+  }
+
+  function commitPiece(candidate: PlacedPiece): boolean {
+    if (!canPlacePiece(mine, candidate)) {
+      setMessage('Cette position est occupée ou touche une autre gemme. Déplacez la gemme.');
+      return false;
     }
     onChange(upsertPiece(mine, candidate));
-    // La case n’est plus vide : une croix ou un rond éventuel n’a plus de sens.
-    if (onCrossesChange && crosses.some((item) => item.col === cell.col && item.row === cell.row)) {
-      onCrossesChange(crosses.filter((item) => !(item.col === cell.col && item.row === cell.row)));
+    removeMarksUnder(candidate);
+    setMessage(null);
+    return true;
+  }
+
+  function placeAt(cell: Cell) {
+    if (disabled) return;
+    const desired = originForPoint(activeKind, rotation, {
+      x: cell.col + 0.5,
+      y: cell.row + 0.5,
+    });
+    const anchor = nearestValidOrigin(mine, activeKind, rotation, desired);
+    commitPiece(createPiece(activeKind, rotation, anchor.x, anchor.y));
+  }
+
+  function beginNewDrag(point: Point) {
+    const anchor = nearestValidOrigin(
+      mine,
+      activeKind,
+      rotation,
+      originForPoint(activeKind, rotation, point),
+    );
+    setHover(null);
+    setDrag({
+      kind: activeKind,
+      rotation,
+      origin: 'new',
+      start: point,
+      anchor,
+      grabOffset: { x: 0, y: 0 },
+      moved: false,
+    });
+    setMessage(null);
+  }
+
+  function beginExistingDrag(piece: PlacedPiece, point: Point) {
+    setHover(null);
+    setDrag({
+      kind: piece.kind,
+      rotation: piece.rotation,
+      origin: 'existing',
+      start: point,
+      anchor: { x: piece.x, y: piece.y },
+      grabOffset: { x: piece.x - point.x, y: piece.y - point.y },
+      moved: false,
+    });
+    setMessage(null);
+  }
+
+  function handleCellPointerDown(_cell: Cell, point: Point) {
+    if (disabled || tool !== 'piece') return;
+    beginNewDrag(point);
+  }
+
+  function handlePiecePointerDown(piece: PlacedPiece, point: Point) {
+    if (disabled || tool !== 'piece') return;
+    selectKind(piece.kind);
+    beginExistingDrag(piece, point);
+  }
+
+  function handleCellPointerMove(
+    cell: Cell | null,
+    point: Point | null,
+    event: ReactPointerEvent<SVGSVGElement>,
+  ) {
+    if (!point) return;
+    if (drag) {
+      const desired =
+        drag.origin === 'new'
+          ? originForPoint(drag.kind, drag.rotation, point)
+          : clampOrigin(
+              drag.kind,
+              drag.rotation,
+              point.x + drag.grabOffset.x,
+              point.y + drag.grabOffset.y,
+            );
+      const anchor = nearestValidOrigin(mine, drag.kind, drag.rotation, desired);
+      const moved = drag.moved || Math.hypot(point.x - drag.start.x, point.y - drag.start.y) > 0.08;
+      if (anchor.x !== drag.anchor.x || anchor.y !== drag.anchor.y || moved !== drag.moved) {
+        setDrag({ ...drag, anchor, moved });
+      }
+      return;
     }
-    if (onColorMarksChange && colorMarkAt(colorMarks, cell)) {
-      onColorMarksChange(
-        colorMarks.filter((mark) => !(mark.cell.col === cell.col && mark.cell.row === cell.row)),
+    if (tool === 'piece' && event.pointerType === 'mouse') {
+      if (!cell) {
+        setHover(null);
+        return;
+      }
+      setHover(
+        nearestValidOrigin(mine, activeKind, rotation, originForPoint(activeKind, rotation, point)),
       );
     }
-    setMessage(null);
+  }
+
+  function handleCellPointerUp(cell: Cell | null) {
+    if (!drag) return;
+    const current = drag;
+    setDrag(null);
+    setHover(null);
+    if (!cell) return;
+    if (current.origin === 'existing' && !current.moved) return;
+    commitPiece(createPiece(current.kind, current.rotation, current.anchor.x, current.anchor.y));
+  }
+
+  function handleCellPointerCancel() {
+    setDrag(null);
+    setHover(null);
+  }
+
+  function handleCellPointerLeave() {
+    if (!drag) setHover(null);
   }
 
   function toggleCross(cell: Cell) {
@@ -221,7 +367,9 @@ export function MineComposer({
     setMessage(null);
   }
 
-  function handleCell(cell: Cell) {
+  function handleCell(cell: Cell, event?: ReactMouseEvent<SVGElement>) {
+    // Un appui réel en mode Gemmes est déjà traité par les événements pointeur.
+    if (tool === 'piece' && event && event.detail > 0) return;
     if (scanMode) {
       if (scanEnabled) onScanCell?.(cell);
       return;
@@ -240,6 +388,18 @@ export function MineComposer({
     }
     placeAt(cell);
   }
+
+  const pieceTool = tool === 'piece';
+  const displayedMine: Mine =
+    drag?.origin === 'existing'
+      ? { version: 1, pieces: mine.pieces.filter((piece) => piece.kind !== drag.kind) }
+      : mine;
+  const ghostPiece = drag
+    ? createPiece(drag.kind, drag.rotation, drag.anchor.x, drag.anchor.y)
+    : hover
+      ? createPiece(activeKind, rotation, hover.x, hover.y)
+      : null;
+  const ghostValid = ghostPiece ? canPlacePiece(mine, ghostPiece) : true;
 
   function rotate() {
     if (disabled) return;
@@ -482,7 +642,7 @@ export function MineComposer({
 
       <div className="board-frame">
         <Board
-          mine={mine}
+          mine={displayedMine}
           crosses={crosses}
           edgeMarks={edgeMarks}
           colorMarks={colorMarks}
@@ -490,7 +650,18 @@ export function MineComposer({
           interactiveEntries={Boolean(scanEnabled && onScanEntry)}
           onEntryAction={scanEnabled ? onScanEntry : undefined}
           onCellAction={disabled ? undefined : handleCell}
+          onCellPointerDown={!disabled && pieceTool ? handleCellPointerDown : undefined}
+          onCellPointerMove={disabled ? undefined : handleCellPointerMove}
+          onCellPointerUp={disabled ? undefined : handleCellPointerUp}
+          onCellPointerCancel={disabled ? undefined : handleCellPointerCancel}
+          onCellPointerLeave={disabled ? undefined : handleCellPointerLeave}
+          onPiecePointerDown={!disabled && pieceTool ? handlePiecePointerDown : undefined}
           interactiveCells={!disabled}
+          piecesInteractive={!disabled && pieceTool}
+          dragEnabled={!disabled && pieceTool}
+          dragging={Boolean(drag)}
+          ghostPiece={ghostPiece}
+          ghostValid={ghostValid}
           ariaLabel={boardAriaLabel ?? fr.placement.board}
           path={path}
           pathColor={pathColor}
@@ -540,6 +711,7 @@ export function MineComposer({
                 ? fr.placement.crossHint
                 : fr.placement.placeHint}
       </p>
+      <p className="visually-hidden">{fr.placement.dragHint}</p>
       {message ? (
         <p className="inline-alert" role="status">
           {message}

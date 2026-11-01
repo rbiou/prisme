@@ -1,4 +1,9 @@
-import type { CSSProperties, KeyboardEvent } from 'react';
+import type {
+  CSSProperties,
+  KeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+} from 'react';
 import {
   BOARD_HEIGHT,
   BOARD_WIDTH,
@@ -13,7 +18,7 @@ import type { ColorMark } from '../engine/colorMarks';
 import { RAY_COLOR_SWATCHES } from '../engine/colors';
 import { edgeSegment, type NoteEdgeMark } from '../engine/noteEdges';
 import { labelForKind, piecePolygon } from '../engine/pieces';
-import type { Cell, GemColor, Mine, Point, RayColor } from '../engine/types';
+import type { Cell, GemColor, Mine, PlacedPiece, Point, RayColor } from '../engine/types';
 
 const GEM_FILL: Record<GemColor, string> = {
   red: '#ef4444',
@@ -21,6 +26,11 @@ const GEM_FILL: Record<GemColor, string> = {
   blue: '#3b82f6',
   white: '#e2e8f0',
 };
+
+export interface BoardPoint {
+  x: number;
+  y: number;
+}
 
 export interface BoardProps {
   mine?: Mine;
@@ -30,16 +40,117 @@ export interface BoardProps {
   colorMarks?: ColorMark[] | null;
   /** Étiquettes de bord déjà utilisées dans le journal public. */
   askedEntries?: ReadonlySet<string> | null;
-  onCellAction?: (cell: Cell) => void;
+  onCellAction?: (cell: Cell, event: ReactMouseEvent<SVGElement>) => void;
+  onCellPointerDown?: (
+    cell: Cell,
+    point: BoardPoint,
+    event: ReactPointerEvent<SVGRectElement>,
+  ) => void;
+  onCellPointerMove?: (
+    cell: Cell | null,
+    point: BoardPoint | null,
+    event: ReactPointerEvent<SVGSVGElement>,
+  ) => void;
+  onCellPointerUp?: (
+    cell: Cell | null,
+    point: BoardPoint | null,
+    event: ReactPointerEvent<SVGSVGElement>,
+  ) => void;
+  onCellPointerCancel?: (event: ReactPointerEvent<SVGSVGElement>) => void;
+  onCellPointerLeave?: (event: ReactPointerEvent<SVGSVGElement>) => void;
+  onPiecePointerDown?: (
+    piece: PlacedPiece,
+    point: BoardPoint,
+    event: ReactPointerEvent<SVGGElement>,
+  ) => void;
   onEntryAction?: (label: string) => void;
   interactiveCells?: boolean;
   interactiveEntries?: boolean;
+  piecesInteractive?: boolean;
+  dragEnabled?: boolean;
+  dragging?: boolean;
+  ghostPiece?: PlacedPiece | null;
+  ghostValid?: boolean;
   highlightCell?: Cell | null;
   path?: Point[] | null;
   pathColor?: RayColor;
   className?: string;
   ariaLabel?: string;
   showNotes?: boolean;
+}
+
+function viewBoxOf(
+  svg: SVGSVGElement,
+): { x: number; y: number; width: number; height: number } | null {
+  const base = svg.viewBox?.baseVal;
+  if (base && base.width > 0 && base.height > 0) {
+    return { x: base.x, y: base.y, width: base.width, height: base.height };
+  }
+  const attribute = svg.getAttribute('viewBox');
+  if (!attribute) return null;
+  const [x, y, width, height] = attribute.split(/[\s,]+/).map(Number);
+  if (
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    !width ||
+    !height
+  ) {
+    return null;
+  }
+  return { x: x ?? 0, y: y ?? 0, width, height };
+}
+
+function boardPointFromClient(
+  svg: SVGSVGElement,
+  clientX: number,
+  clientY: number,
+): BoardPoint | null {
+  const rect = svg.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+  const viewBox = viewBoxOf(svg);
+  if (!viewBox) return null;
+  return {
+    x: viewBox.x + ((clientX - rect.left) / rect.width) * viewBox.width,
+    y: viewBox.y + ((clientY - rect.top) / rect.height) * viewBox.height,
+  };
+}
+
+function capturePointer(element: Element | null, pointerId: number): void {
+  try {
+    element?.setPointerCapture(pointerId);
+  } catch {
+    // Le pointeur peut déjà être relâché ou la capture non prise en charge.
+  }
+}
+
+function releasePointer(element: Element | null, pointerId: number): void {
+  try {
+    element?.releasePointerCapture(pointerId);
+  } catch {
+    // La capture a pu être perdue entre-temps.
+  }
+}
+
+function cellForPoint(point: BoardPoint | null): Cell | null {
+  if (!point) return null;
+  if (point.x < 0 || point.x >= BOARD_WIDTH || point.y < 0 || point.y >= BOARD_HEIGHT) {
+    return null;
+  }
+  return { col: Math.floor(point.x), row: Math.floor(point.y) };
+}
+
+function cellFromTarget(target: EventTarget | null): Cell | null {
+  if (!(target instanceof Element)) return null;
+  const element = target.closest('[data-cell]');
+  const value = element?.getAttribute('data-cell');
+  if (!value) return null;
+  const parts = value.split(',');
+  const col = Number(parts[0]);
+  const row = Number(parts[1]);
+  if (!Number.isInteger(col) || !Number.isInteger(row)) return null;
+  return { col, row };
 }
 
 function polygonPoints(points: Point[]): string {
@@ -77,13 +188,6 @@ function PatternDefs() {
           />
         </pattern>
       ))}
-      <filter id="gem-glow" x="-40%" y="-40%" width="180%" height="180%">
-        <feGaussianBlur stdDeviation="0.08" result="blur" />
-        <feMerge>
-          <feMergeNode in="blur" />
-          <feMergeNode in="SourceGraphic" />
-        </feMerge>
-      </filter>
     </defs>
   );
 }
@@ -96,9 +200,20 @@ export function Board({
   colorMarks = null,
   askedEntries = null,
   onCellAction,
+  onCellPointerDown,
+  onCellPointerMove,
+  onCellPointerUp,
+  onCellPointerCancel,
+  onCellPointerLeave,
+  onPiecePointerDown,
   onEntryAction,
   interactiveCells = false,
   interactiveEntries = false,
+  piecesInteractive = false,
+  dragEnabled = false,
+  dragging = false,
+  ghostPiece = null,
+  ghostValid = true,
   highlightCell = null,
   path = null,
   pathColor = 'white',
@@ -107,6 +222,11 @@ export function Board({
   showNotes = true,
 }: BoardProps) {
   const cellAction = interactiveCells && onCellAction ? onCellAction : null;
+  const cellPointerDown = interactiveCells && onCellPointerDown ? onCellPointerDown : null;
+  const piecePointerDown = piecesInteractive && onPiecePointerDown ? onPiecePointerDown : null;
+  const hasPointerHandlers = Boolean(
+    onCellPointerDown || onCellPointerMove || onCellPointerUp || onCellPointerCancel,
+  );
   const entryAction = interactiveEntries && onEntryAction ? onEntryAction : null;
   const pathStroke = RAY_COLOR_SWATCHES[pathColor];
   const style = { '--ray-color': pathStroke } as CSSProperties;
@@ -120,11 +240,49 @@ export function Board({
 
   return (
     <svg
-      className={`board-svg${cellAction ? ' board-svg--cells' : ''}${className ? ` ${className}` : ''}`}
+      className={`board-svg${cellAction || cellPointerDown ? ' board-svg--cells' : ''}${
+        dragEnabled ? ' board-svg--drag' : ''
+      }${dragging ? ' is-dragging' : ''}${className ? ` ${className}` : ''}`}
       viewBox="-1.15 -0.95 12.3 10.1"
       role="group"
       aria-label={ariaLabel}
       style={style}
+      onPointerMove={
+        onCellPointerMove
+          ? (event) => {
+              const point = boardPointFromClient(event.currentTarget, event.clientX, event.clientY);
+              const cell = cellForPoint(point) ?? cellFromTarget(event.target);
+              onCellPointerMove(
+                cell,
+                point ?? (cell ? { x: cell.col + 0.5, y: cell.row + 0.5 } : null),
+                event,
+              );
+            }
+          : undefined
+      }
+      onPointerUp={
+        hasPointerHandlers
+          ? (event) => {
+              const point = boardPointFromClient(event.currentTarget, event.clientX, event.clientY);
+              const cell = cellForPoint(point) ?? cellFromTarget(event.target);
+              onCellPointerUp?.(
+                cell,
+                point ?? (cell ? { x: cell.col + 0.5, y: cell.row + 0.5 } : null),
+                event,
+              );
+              releasePointer(event.currentTarget, event.pointerId);
+            }
+          : undefined
+      }
+      onPointerCancel={
+        hasPointerHandlers
+          ? (event) => {
+              onCellPointerCancel?.(event);
+              releasePointer(event.currentTarget, event.pointerId);
+            }
+          : undefined
+      }
+      onPointerLeave={onCellPointerLeave}
     >
       <PatternDefs />
 
@@ -138,7 +296,7 @@ export function Board({
         ))}
       </g>
 
-      {cellAction ? (
+      {cellAction || cellPointerDown ? (
         <g className="board-cells">
           {Array.from({ length: BOARD_HEIGHT }, (_, row) =>
             Array.from({ length: BOARD_WIDTH }, (_, col) => (
@@ -149,7 +307,24 @@ export function Board({
                 width="1"
                 height="1"
                 className="board-cell-hit"
-                onClick={() => cellAction({ col, row })}
+                data-cell={`${col},${row}`}
+                onClick={cellAction ? (event) => cellAction({ col, row }, event) : undefined}
+                onPointerDown={
+                  cellPointerDown
+                    ? (event) => {
+                        const svg = event.currentTarget.ownerSVGElement;
+                        capturePointer(svg, event.pointerId);
+                        const point = svg
+                          ? boardPointFromClient(svg, event.clientX, event.clientY)
+                          : null;
+                        cellPointerDown(
+                          { col, row },
+                          point ?? { x: col + 0.5, y: row + 0.5 },
+                          event,
+                        );
+                      }
+                    : undefined
+                }
               >
                 <title>{`Case ${String.fromCharCode(65 + row)}${col + 1}`}</title>
               </rect>
@@ -202,7 +377,43 @@ export function Board({
       ) : null}
 
       {mine?.pieces.map((piece) => (
-        <g key={piece.id} className="board-gem" filter="url(#gem-glow)">
+        <g
+          key={piece.id}
+          className={`board-gem${piecePointerDown ? ' board-gem--movable' : ''}`}
+          onPointerDown={
+            piecePointerDown
+              ? (event) => {
+                  event.preventDefault();
+                  const svg = event.currentTarget.ownerSVGElement;
+                  capturePointer(svg, event.pointerId);
+                  const point = svg
+                    ? boardPointFromClient(svg, event.clientX, event.clientY)
+                    : null;
+                  piecePointerDown(piece, point ?? { x: piece.x + 0.5, y: piece.y + 0.5 }, event);
+                }
+              : undefined
+          }
+          onClick={
+            !piecePointerDown && cellAction
+              ? (event) => {
+                  const svg = event.currentTarget.ownerSVGElement;
+                  const point = svg
+                    ? boardPointFromClient(svg, event.clientX, event.clientY)
+                    : null;
+                  const cell = cellForPoint(point) ?? {
+                    col: Math.floor(piece.x + 0.5),
+                    row: Math.floor(piece.y + 0.5),
+                  };
+                  cellAction(cell, event);
+                }
+              : undefined
+          }
+        >
+          <polygon
+            points={polygonPoints(piecePolygon(piece))}
+            fill={GEM_FILL[piece.color]}
+            className="board-gem-solid"
+          />
           <polygon
             points={polygonPoints(piecePolygon(piece))}
             fill={`url(#gem-${piece.color})`}
@@ -214,6 +425,21 @@ export function Board({
           </polygon>
         </g>
       ))}
+
+      {ghostPiece ? (
+        <g className={`board-ghost${ghostValid ? ' is-valid' : ' is-invalid'}`} aria-hidden="true">
+          <polygon
+            points={polygonPoints(piecePolygon(ghostPiece))}
+            fill={GEM_FILL[ghostPiece.color]}
+            className="board-ghost-solid"
+          />
+          <polygon
+            points={polygonPoints(piecePolygon(ghostPiece))}
+            fill={`url(#gem-${ghostPiece.color})`}
+            className="board-ghost-pattern"
+          />
+        </g>
+      ) : null}
 
       {edgeMarks && edgeMarks.length > 0 ? (
         <g className="board-edges" aria-hidden="true">

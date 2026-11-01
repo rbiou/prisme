@@ -43,7 +43,10 @@ export const fr = {
     palette: 'Gemmes',
     board: 'Plateau de votre mine',
     selected: 'Pièce sélectionnée',
-    placeHint: 'Touchez une intersection du plateau pour placer ou déplacer la pièce.',
+    placeHint:
+      'Touchez le plateau pour poser la gemme, puis faites-la glisser pour l’ajuster. Touchez une gemme déjà posée pour la déplacer.',
+    dragHint:
+      'Faites glisser une gemme pour la déplacer. Le contour du fantôme est vert si la position est valide, rouge sinon.',
     notesTool: 'Outil des notes privées',
     pieceTool: 'Gemmes',
     crossTool: 'Croix',

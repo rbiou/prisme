@@ -1213,6 +1213,49 @@ input[type='checkbox'] {
   filter: drop-shadow(0 0.05px 0.12px rgba(0, 0, 0, 0.65));
 }
 
+.board-gem-solid {
+  stroke: none;
+}
+
+.board-gem--movable {
+  cursor: grab;
+}
+
+.board-gem--movable:active {
+  cursor: grabbing;
+}
+
+.board-svg--drag {
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.board-svg--drag.is-dragging {
+  cursor: grabbing;
+}
+
+.board-ghost {
+  pointer-events: none;
+  opacity: 0.72;
+}
+
+.board-ghost polygon {
+  stroke-width: 0.06px;
+  stroke-linejoin: round;
+}
+
+.board-ghost.is-valid polygon {
+  stroke: #34d399;
+}
+
+.board-ghost.is-invalid polygon {
+  stroke: #fb7185;
+}
+
+.board-ghost.is-invalid {
+  opacity: 0.55;
+}
+
 .board-ray polyline {
   filter: drop-shadow(0 0 0.12px var(--ray-color, #fff));
   opacity: 0.95;
