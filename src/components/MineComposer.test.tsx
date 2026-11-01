@@ -140,6 +140,24 @@ describe('MineComposer — croix des notes privées', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('ignore une croix demandée sous une gemme de note', () => {
+    const onCrossesChange = vi.fn();
+    render(
+      <MineComposer
+        mine={{ version: 1, pieces: [createPiece('red-parallelogram', 0, 4, 4)] }}
+        onChange={vi.fn()}
+        crosses={[]}
+        onCrossesChange={onCrossesChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Croix' }));
+    const gem = document.querySelector('.board-gem polygon') as Element;
+    fireEvent.click(gem);
+
+    expect(onCrossesChange).not.toHaveBeenCalled();
+  });
+
   it('retire une croix déjà posée', () => {
     const { onCrossesChange } = renderComposer([{ col: 2, row: 1 }]);
 

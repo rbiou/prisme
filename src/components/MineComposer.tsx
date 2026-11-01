@@ -184,6 +184,14 @@ export function MineComposer({
     setMessage(null);
   }
 
+  function cellCoveredByPiece(cell: Cell): boolean {
+    return mine.pieces.some((piece) =>
+      cellsTouchedByPiece(piece).some(
+        (covered) => covered.col === cell.col && covered.row === cell.row,
+      ),
+    );
+  }
+
   function removeMarksUnder(piece: PlacedPiece) {
     const cells = cellsTouchedByPiece(piece);
     const touched = (cell: Cell) =>
@@ -372,6 +380,10 @@ export function MineComposer({
     if (tool === 'piece' && event && event.detail > 0) return;
     if (scanMode) {
       if (scanEnabled) onScanCell?.(cell);
+      return;
+    }
+    if ((crossMode || edgeMode || dotMode) && cellCoveredByPiece(cell)) {
+      setMessage('Cette case est déjà occupée par une gemme de vos notes.');
       return;
     }
     if (crossMode) {
