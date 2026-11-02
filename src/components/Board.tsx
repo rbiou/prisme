@@ -63,7 +63,11 @@ function patternFor(piece: PlacedPiece): string {
 
 function pieceTitle(piece: PlacedPiece): string {
   const special = specialKindOf(piece);
-  if (special) return `${labelForKind(piece.kind)} — ${SPECIAL_COLOR_LABELS[special]}`;
+  if (special) {
+    const label = labelForKind(piece.kind);
+    const extra = SPECIAL_COLOR_LABELS[special];
+    return extra === label ? label : `${label} — ${extra}`;
+  }
   return `${labelForKind(piece.kind)} — ${piece.color ?? 'incolore'}`;
 }
 

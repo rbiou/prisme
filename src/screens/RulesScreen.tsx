@@ -49,8 +49,8 @@ export function RulesScreen({ onBack }: { onBack: () => void }) {
               blanche en losange.
             </li>
             <li>
-              En mode spécial, deux gemmes supplémentaires en rectangle de deux cases : le Diamant
-              et le Corps noir.
+              En mode spécial, deux gemmes supplémentaires : le Diamant, triangle isocèle qui tient
+              dans deux cases, et le Corps noir, rectangle de deux cases.
             </li>
             <li>
               Les bords sont étiquetés : <strong>1 à 10</strong> en haut, <strong>11 à 18</strong> à
@@ -72,8 +72,9 @@ export function RulesScreen({ onBack }: { onBack: () => void }) {
           </p>
           <ul>
             <li>
-              <strong>Diamant</strong> : un rectangle de deux cases, blanc et brillant. Il réfléchit
-              les rayons comme une gemme, mais n’ajoute aucune couleur au mélange.
+              <strong>Diamant</strong> : un triangle isocèle qui tient dans deux cases, blanc et
+              brillant. Il réfléchit les rayons comme une gemme, mais n’ajoute aucune couleur au
+              mélange.
             </li>
             <li>
               <strong>Corps noir</strong> : un rectangle de deux cases, noir. Il absorbe le rayon :

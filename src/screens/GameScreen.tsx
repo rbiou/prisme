@@ -18,7 +18,7 @@ import {
 import { isNoteEdgeMark, type NoteEdgeMark } from '../engine/noteEdges';
 import { validateMine } from '../engine/placement';
 import { simulateRay } from '../engine/ray';
-import { RAY_COLOR_LABELS, SPECIAL_COLOR_LABELS } from '../engine/colors';
+import { RAY_COLOR_LABELS, SPECIAL_ANSWER_LABELS } from '../engine/colors';
 import type {
   Cell,
   Mine,
@@ -185,7 +185,7 @@ function GameJournal({
                   )
                 ) : scan.answer.special ? (
                   <span className="journal-special">
-                    {SPECIAL_COLOR_LABELS[scan.answer.special]}
+                    {SPECIAL_ANSWER_LABELS[scan.answer.special]}
                   </span>
                 ) : (
                   <ColorChip
@@ -205,8 +205,10 @@ function GameJournal({
                       role="status"
                     >
                       <span>
-                        {privateRayLabel(simulation.result)} ·{' '}
-                        {RAY_COLOR_LABELS[simulation.result.color]}
+                        {privateRayLabel(simulation.result)}
+                        {simulation.result.status === 'exit'
+                          ? ` · ${RAY_COLOR_LABELS[simulation.result.color]}`
+                          : null}
                       </span>
                       <strong>
                         {simulation.matches ? 'Cohérente avec la réponse' : 'Contredit la réponse'}
@@ -848,7 +850,9 @@ export function GameScreen({
               />
               <div className="answer-summary">
                 <span>{privateRayLabel(incomingScanResult.result)}</span>
-                <ColorChip color={incomingScanResult.result.color} />
+                {incomingScanResult.result.status === 'exit' ? (
+                  <ColorChip color={incomingScanResult.result.color} />
+                ) : null}
               </div>
               {incomingScanResult.result.status === 'loop' ? (
                 <p className="inline-alert">{fr.game.loopWarning}</p>
@@ -859,10 +863,16 @@ export function GameScreen({
               <PrivateBoard mine={myMine} highlight={incomingScanResult.cell} />
               <div className="answer-summary">
                 <span>{fr.game.yourAnswer}</span>
-                <ColorChip
-                  color={incomingScanResult.result.color}
-                  label={incomingScanResult.result.color ?? 'Rien'}
-                />
+                {incomingScanResult.result.special ? (
+                  <span className="journal-special">
+                    {SPECIAL_ANSWER_LABELS[incomingScanResult.result.special]}
+                  </span>
+                ) : (
+                  <ColorChip
+                    color={incomingScanResult.result.color}
+                    label={incomingScanResult.result.color ? undefined : 'Rien'}
+                  />
+                )}
               </div>
             </>
           ) : null}
@@ -901,17 +911,25 @@ export function GameScreen({
                   />
                   <div className="answer-summary">
                     <span>{privateRayLabel(confirmationQuestion.result)}</span>
-                    <ColorChip color={confirmationQuestion.result.color} />
+                    {confirmationQuestion.result.status === 'exit' ? (
+                      <ColorChip color={confirmationQuestion.result.color} />
+                    ) : null}
                   </div>
                 </>
               ) : (
                 <>
                   <PrivateBoard mine={myMine} highlight={confirmationQuestion.cell} />
                   <div className="answer-summary">
-                    <ColorChip
-                      color={confirmationQuestion.result.color}
-                      label={confirmationQuestion.result.color ?? 'Rien'}
-                    />
+                    {confirmationQuestion.result.special ? (
+                      <span className="journal-special">
+                        {SPECIAL_ANSWER_LABELS[confirmationQuestion.result.special]}
+                      </span>
+                    ) : (
+                      <ColorChip
+                        color={confirmationQuestion.result.color}
+                        label={confirmationQuestion.result.color ? undefined : 'Rien'}
+                      />
+                    )}
                   </div>
                 </>
               )}

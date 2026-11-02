@@ -21,6 +21,12 @@ export const SPECIAL_COLOR_LABELS: Record<SpecialPieceKind, string> = {
   'black-body': 'Corps noir',
 };
 
+/** Réponse publique d’un scan de case sur une gemme spéciale. */
+export const SPECIAL_ANSWER_LABELS: Record<SpecialPieceKind, string> = {
+  'clear-diamond': 'Diamant',
+  'black-body': 'Le signal a été absorbé',
+};
+
 /** Couleurs de rendu des gemmes, y compris les deux gemmes spéciales. */
 export const GEM_COLOR_SWATCHES: Record<GemColor, string> = {
   red: '#ef4444',

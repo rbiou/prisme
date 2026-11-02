@@ -19,7 +19,7 @@ const EXPECTED = {
   'blue-triangle': { area: 4, width: 4, height: 2, color: 'blue' },
   'white-triangle': { area: 4, width: 4, height: 2, color: 'white' },
   'white-diamond': { area: 2, width: 2, height: 2, color: 'white' },
-  'clear-diamond': { area: 2, width: 2, height: 1, color: null },
+  'clear-diamond': { area: 1, width: 2, height: 1, color: null },
   'black-body': { area: 2, width: 2, height: 1, color: null },
 } as const;
 
@@ -38,15 +38,37 @@ describe('pieces', () => {
     );
   });
 
-  it('ajoute les deux gemmes spéciales en rectangle de deux cases', () => {
+  it('taille les deux gemmes spéciales dans un rectangle de 2 × 1', () => {
     expect(PIECE_DEFINITIONS['clear-diamond'].color).toBeNull();
     expect(PIECE_DEFINITIONS['black-body'].color).toBeNull();
-    for (const kind of ['clear-diamond', 'black-body'] as const) {
-      const polygon = shapeFor(kind, 0);
-      const box = boundingBox(polygon);
-      expect(box.width).toBeCloseTo(2, 9);
-      expect(box.height).toBeCloseTo(1, 9);
-      expect(polygonArea(polygon)).toBeCloseTo(2, 9);
+    const diamond = shapeFor('clear-diamond', 0);
+    const diamondBox = boundingBox(diamond);
+    expect(diamondBox.width).toBeCloseTo(2, 9);
+    expect(diamondBox.height).toBeCloseTo(1, 9);
+    expect(polygonArea(diamond)).toBeCloseTo(1, 9);
+    const blackBody = shapeFor('black-body', 0);
+    const blackBox = boundingBox(blackBody);
+    expect(blackBox.width).toBeCloseTo(2, 9);
+    expect(blackBox.height).toBeCloseTo(1, 9);
+    expect(polygonArea(blackBody)).toBeCloseTo(2, 9);
+  });
+
+  it('donne au Diamant un triangle isocèle aux quatre rotations', () => {
+    const shapes = ([0, 1, 2, 3] as const).map((rotation) => shapeFor('clear-diamond', rotation));
+    expect(new Set(shapes.map((shape) => JSON.stringify(shape))).size).toBe(4);
+    for (const shape of shapes) {
+      expect(shape).toHaveLength(3);
+      const sides = shape.map((point, index) => {
+        const next = shape[(index + 1) % shape.length];
+        return Math.hypot(next.x - point.x, next.y - point.y);
+      });
+      const [first, second, third] = sides;
+      const equalPairs = [
+        Math.abs(first - second) < 1e-9,
+        Math.abs(second - third) < 1e-9,
+        Math.abs(first - third) < 1e-9,
+      ].filter(Boolean);
+      expect(equalPairs).toHaveLength(1);
     }
   });
 

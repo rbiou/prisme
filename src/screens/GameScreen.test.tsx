@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { entryForLabel } from '../engine/board';
 import { createGame } from '../engine/endgame';
+import { createPiece } from '../engine/pieces';
 import type { GameState, Mine } from '../engine/types';
 import type { MatchState } from '../state/matchReducer';
 import { GameScreen } from './GameScreen';
@@ -10,12 +11,12 @@ afterEach(cleanup);
 
 const EMPTY_MINE: Mine = { version: 1, pieces: [] };
 
-function createState(game: GameState): MatchState {
+function createState(game: GameState, mine: Mine = EMPTY_MINE): MatchState {
   return {
     role: 'host',
     playerName: 'Camille',
     roomCode: '123456',
-    mode: 'base',
+    mode: game.mode,
     sessionPhase: 'ready',
     sessionDetail: null,
     transportStatus: 'connected',
@@ -23,7 +24,7 @@ function createState(game: GameState): MatchState {
     error: null,
     notice: null,
     locked: {
-      mine: EMPTY_MINE,
+      mine,
       salt: '0'.repeat(32),
       hash: 'a'.repeat(64),
     },
@@ -37,7 +38,7 @@ function createState(game: GameState): MatchState {
   };
 }
 
-function renderGame(game: GameState = createGame('host')) {
+function renderGame(game: GameState = createGame('host'), mine: Mine = EMPTY_MINE) {
   const onWave = vi.fn(() => true);
   const onCell = vi.fn(() => true);
   const onAnswer = vi.fn(() => true);
@@ -53,7 +54,7 @@ function renderGame(game: GameState = createGame('host')) {
 
   render(
     <GameScreen
-      state={createState(game)}
+      state={createState(game, mine)}
       onWave={onWave}
       onCell={onCell}
       onAnswer={onAnswer}
@@ -229,5 +230,57 @@ describe('GameScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer et envoyer' }));
 
     expect(onAnswer).toHaveBeenCalledTimes(1);
+  });
+
+  it('annonce l’absorption sans couleur quand le rayon atteint le Corps noir', () => {
+    const game: GameState = {
+      ...createGame('host', 'special'),
+      pendingScan: {
+        id: 'scan-incoming',
+        by: 'guest',
+        kind: 'wave',
+        entry: entryForLabel('D'),
+      },
+    };
+    const mine: Mine = {
+      version: 1,
+      pieces: [createPiece('black-body', 0, 4, 3)],
+    };
+    renderGame(game, mine);
+
+    const dialog = screen.getByRole('dialog', { name: 'Question de l’adversaire' });
+    expect(within(dialog).getByText('Signal absorbé')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Incolore')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Confirmer et envoyer' })).toBeEnabled();
+  });
+
+  it('nomme le Diamant lors d’un scan de case adverse', () => {
+    const game: GameState = {
+      ...createGame('host', 'special'),
+      pendingScan: { id: 'cell-diamond', by: 'guest', kind: 'cell', cell: { col: 4, row: 3 } },
+    };
+    const mine: Mine = {
+      version: 1,
+      pieces: [createPiece('clear-diamond', 0, 4, 3)],
+    };
+    renderGame(game, mine);
+
+    const dialog = screen.getByRole('dialog', { name: 'Question de l’adversaire' });
+    expect(dialog.querySelector('.journal-special')?.textContent).toBe('Diamant');
+  });
+
+  it('annonce l’absorption pour un scan de case sur le Corps noir', () => {
+    const game: GameState = {
+      ...createGame('host', 'special'),
+      pendingScan: { id: 'cell-black', by: 'guest', kind: 'cell', cell: { col: 4, row: 3 } },
+    };
+    const mine: Mine = {
+      version: 1,
+      pieces: [createPiece('black-body', 0, 4, 3)],
+    };
+    renderGame(game, mine);
+
+    const dialog = screen.getByRole('dialog', { name: 'Question de l’adversaire' });
+    expect(dialog.querySelector('.journal-special')?.textContent).toBe('Le signal a été absorbé');
   });
 });

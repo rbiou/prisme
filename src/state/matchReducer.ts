@@ -1,5 +1,5 @@
 import { cellLabel, entryForLabel, sideLabel } from '../engine/board';
-import { GEM_COLOR_LABELS, RAY_COLOR_LABELS, SPECIAL_COLOR_LABELS } from '../engine/colors';
+import { GEM_COLOR_LABELS, RAY_COLOR_LABELS, SPECIAL_ANSWER_LABELS } from '../engine/colors';
 import { isSerializedMine } from '../engine/mine';
 import {
   answerScan,
@@ -182,7 +182,7 @@ function describeAnswer(answer: ScanAnswer): string {
       ? 'le signal a été absorbé'
       : `sortie ${answer.exit.label} · ${RAY_COLOR_LABELS[answer.color]}`;
   }
-  if (answer.special) return SPECIAL_COLOR_LABELS[answer.special];
+  if (answer.special) return SPECIAL_ANSWER_LABELS[answer.special];
   return answer.color ? GEM_COLOR_LABELS[answer.color] : 'aucune gemme';
 }
 

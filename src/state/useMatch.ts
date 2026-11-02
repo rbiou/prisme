@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { waveAnswerFromResult } from '../engine/answers';
 import { entryForLabel, isCell } from '../engine/board';
 import { scanCell } from '../engine/cellScan';
 import { isColorMark } from '../engine/colorMarks';
@@ -672,18 +673,15 @@ export function useMatch(settings: Settings): UseMatchResult {
 
     let answer: ScanAnswer;
     if (pending.kind === 'wave' && pending.entry) {
-      const result = simulateRay(mine, pending.entry);
-      if (result.status === 'loop' || !result.exit) {
+      const wave = waveAnswerFromResult(simulateRay(mine, pending.entry));
+      if (!wave) {
         dispatch({
           type: 'error',
           message: 'Cette mine produit une boucle de rayon : répondez impossible.',
         });
         return false;
       }
-      answer =
-        result.status === 'absorbed'
-          ? { kind: 'wave', absorbed: true }
-          : { kind: 'wave', exit: result.exit, color: result.color };
+      answer = wave;
     } else if (pending.kind === 'cell' && pending.cell) {
       const result = scanCell(mine, pending.cell);
       answer = result.special
@@ -781,18 +779,15 @@ export function useMatch(settings: Settings): UseMatchResult {
 
     let answer: ScanAnswer;
     if (original.kind === 'wave' && original.entry) {
-      const result = simulateRay(mine, original.entry);
-      if (result.status === 'loop' || !result.exit) {
+      const wave = waveAnswerFromResult(simulateRay(mine, original.entry));
+      if (!wave) {
         dispatch({
           type: 'error',
           message: 'Cette mine produit une boucle de rayon : confirmation impossible.',
         });
         return false;
       }
-      answer =
-        result.status === 'absorbed'
-          ? { kind: 'wave', absorbed: true }
-          : { kind: 'wave', exit: result.exit, color: result.color };
+      answer = wave;
     } else if (original.kind === 'cell' && original.cell) {
       const result = scanCell(mine, original.cell);
       answer = result.special

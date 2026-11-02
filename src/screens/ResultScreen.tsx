@@ -3,7 +3,7 @@ import { Board } from '../components/Board';
 import { ColorChip } from '../components/ColorChip';
 import { PrismMark } from '../components/AppHeader';
 import { otherPlayer, endReasonLabel } from '../engine/endgame';
-import { SPECIAL_COLOR_LABELS } from '../engine/colors';
+import { SPECIAL_ANSWER_LABELS } from '../engine/colors';
 import { deserializeMine, deserializeNote, serializeMine } from '../engine/mine';
 import type { GameState, Mine, PlayerId } from '../engine/types';
 import { fr } from '../i18n/fr';
@@ -532,7 +532,9 @@ export function ResultScreen({
                       </>
                     )
                   ) : scan.answer.special ? (
-                    SPECIAL_COLOR_LABELS[scan.answer.special]
+                    <span className="journal-special">
+                      {SPECIAL_ANSWER_LABELS[scan.answer.special]}
+                    </span>
                   ) : (
                     <ColorChip
                       color={scan.answer.color}

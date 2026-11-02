@@ -148,7 +148,8 @@ interface Mine {
 ```
 
 Le mode `base` utilise les cinq pièces historiques ; le mode `special` ajoute
-le Diamant et le Corps noir, deux rectangles 2 × 1. L'ancre `(x, y)` est le coin
+le Diamant et le Corps noir. Le Diamant est un triangle isocèle de 2 × 1 ; le
+Corps noir, un rectangle de 2 × 1. L'ancre `(x, y)` est le coin
 supérieur gauche de la boîte englobante de la pièce après rotation. Les polygones
 canoniques et leurs quatre rotations sont définis dans `pieces.ts`.
 

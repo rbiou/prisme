@@ -15,7 +15,8 @@ schémas et libellés sont originaux.
   - une gemme **blanche** en forme de grand triangle isocèle rectangle ;
   - une gemme **blanche** en forme de losange.
 - En mode spécial, deux gemmes supplémentaires par joueur :
-  - le **Diamant**, rectangle de deux cases, blanc et brillant ;
+  - le **Diamant**, triangle isocèle qui tient dans un rectangle de deux cases,
+    blanc et brillant ;
   - le **Corps noir**, rectangle de deux cases, noir.
 - Une grille de prospection pour noter les hypothèses.
 - Un moyen de tirer des rayons depuis le bord du plateau.
@@ -61,7 +62,7 @@ intersections de la grille.
 | Bleue            | triangle isocèle rectangle, base = 4, hauteur = 2      | 4 × 2            | 4 cases |
 | Blanche triangle | même forme que la bleue                                | 4 × 2            | 4 cases |
 | Blanche losange  | carré tourné à 45°, diagonales 2 × 2                   | 2 × 2            | 2 cases |
-| Diamant          | rectangle 2 × 1                                        | 2 × 1            | 2 cases |
+| Diamant          | triangle isocèle, base = 2, hauteur = 1                | 2 × 1            | 1 case  |
 | Corps noir       | rectangle 2 × 1                                        | 2 × 1            | 2 cases |
 
 Les pièces peuvent être tournées par pas de **90°**. Elles ne peuvent pas être

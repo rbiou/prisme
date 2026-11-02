@@ -65,15 +65,15 @@ const BASE_SHAPES: Record<PieceKind, { color: GemColor | null; label: string; po
       { x: 0, y: 1 },
     ],
   },
-  // Les deux gemmes spéciales occupent un rectangle de 2 cases sur 1.
+  // Le diamant est un triangle isocèle de deux cases de base et d’une case de
+  // haut : il tient dans un rectangle de 2 × 1 et ne modifie pas la couleur.
   'clear-diamond': {
     color: null,
     label: 'Diamant',
     points: [
-      { x: 0, y: 0 },
-      { x: 2, y: 0 },
-      { x: 2, y: 1 },
       { x: 0, y: 1 },
+      { x: 2, y: 1 },
+      { x: 1, y: 0 },
     ],
   },
   'black-body': {
