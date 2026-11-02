@@ -1,15 +1,16 @@
 import { BOARD_HEIGHT, BOARD_WIDTH } from './board';
 import { boundingBox, polygonsEqual, polygonsOverlap, sharedBoundaryLength } from './geometry';
 import {
-  BASE_PIECE_KINDS,
   colorForKind,
   isPieceKind,
   isRotation,
+  pieceKindsForMode,
   piecePolygon,
   PIECE_ORDER,
 } from './pieces';
 import { hitPieceIds, simulateAllRays } from './ray';
 import type {
+  GameMode,
   Mine,
   PieceKind,
   PlacedPiece,
@@ -20,6 +21,7 @@ import type {
 } from './types';
 
 const DEFAULT_OPTIONS: Required<ValidationOptions> = {
+  mode: 'base',
   enforceWhiteSymmetry: true,
   requireReachable: true,
   rejectLoops: true,
@@ -99,9 +101,10 @@ function geometryErrors(piece: PlacedPiece): ValidationError[] {
   return errors;
 }
 
-function setErrors(pieces: PlacedPiece[], requireAll: boolean): ValidationError[] {
+function setErrors(pieces: PlacedPiece[], requireAll: boolean, mode: GameMode): ValidationError[] {
   const errors: ValidationError[] = [];
   const seen = new Set<PieceKind>();
+  const expected = pieceKindsForMode(mode);
   for (const piece of pieces) {
     if (seen.has(piece.kind)) {
       errors.push({
@@ -114,7 +117,7 @@ function setErrors(pieces: PlacedPiece[], requireAll: boolean): ValidationError[
   }
 
   if (requireAll) {
-    for (const kind of BASE_PIECE_KINDS) {
+    for (const kind of expected) {
       if (!seen.has(kind)) {
         errors.push({
           code: 'invalid-piece-count',
@@ -123,10 +126,10 @@ function setErrors(pieces: PlacedPiece[], requireAll: boolean): ValidationError[
         });
       }
     }
-    if (pieces.length !== BASE_PIECE_KINDS.length) {
+    if (pieces.length !== expected.length) {
       errors.push({
         code: 'invalid-piece-count',
-        message: `La mine doit contenir exactement ${BASE_PIECE_KINDS.length} gemmes.`,
+        message: `La mine doit contenir exactement ${expected.length} gemmes.`,
       });
     }
   }
@@ -219,7 +222,7 @@ export function validatePieces(
   const resolved = { ...DEFAULT_OPTIONS, ...options };
   const errors: ValidationError[] = [];
 
-  errors.push(...setErrors(pieces, options.requireAll ?? true));
+  errors.push(...setErrors(pieces, options.requireAll ?? true, resolved.mode));
   for (const piece of pieces) {
     errors.push(...geometryErrors(piece));
   }

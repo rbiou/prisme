@@ -1217,6 +1217,10 @@ input[type='checkbox'] {
   stroke: none;
 }
 
+.board-gem-aura {
+  pointer-events: none;
+}
+
 .board-gem--movable {
   cursor: grab;
 }
@@ -1925,6 +1929,24 @@ input[type='checkbox'] {
   border-radius: 6px;
 }
 
+.journal-absorbed,
+.journal-special {
+  display: inline-flex;
+  min-height: 24px;
+  padding: 3px 8px;
+  align-items: center;
+  color: #e2e8f0;
+  font-size: 0.76rem;
+  font-weight: 600;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 190, 235, 0.28);
+  border-radius: 6px;
+}
+
+.journal-absorbed {
+  border-color: rgba(167, 139, 250, 0.45);
+}
+
 .journal-main .text-link {
   margin-top: 6px;
   font-size: 0.74rem;
@@ -2547,6 +2569,53 @@ input[type='checkbox'] {
 .setting-copy p {
   margin-bottom: 0;
   font-size: 0.86rem;
+}
+
+.mode-choices {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.mode-choice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  cursor: pointer;
+  background: rgba(148, 190, 235, 0.04);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.mode-choice input {
+  margin-top: 3px;
+  accent-color: #67e8f9;
+}
+
+.mode-choice > span {
+  display: grid;
+  gap: 2px;
+}
+
+.mode-choice > span > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.mode-choice.is-active {
+  background: rgba(103, 232, 249, 0.08);
+  border-color: rgba(103, 232, 249, 0.42);
+}
+
+.mode-choice:focus-within {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
 }
 
 .switch {

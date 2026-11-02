@@ -55,4 +55,16 @@ describe('scan de case', () => {
     expect(result.areas[1]?.pieceId).toBe('white-diamond');
     expect(result.areas[1]?.area).toBeCloseTo(0.5, 9);
   });
+
+  it('annonce le Diamant et le Corps noir sur une case couverte', () => {
+    const diamond = scanCell(mineOf([createPiece('clear-diamond', 0, 1, 1)]), { col: 2, row: 1 });
+    expect(diamond.special).toBe('clear-diamond');
+    expect(diamond.color).toBeNull();
+    expect(diamond.pieceId).toBe('clear-diamond');
+
+    const blackBody = scanCell(mineOf([createPiece('black-body', 0, 1, 1)]), { col: 2, row: 1 });
+    expect(blackBody.special).toBe('black-body');
+    expect(blackBody.color).toBeNull();
+    expect(blackBody.pieceId).toBe('black-body');
+  });
 });

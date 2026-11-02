@@ -15,6 +15,7 @@ function createState(game: GameState): MatchState {
     role: 'host',
     playerName: 'Camille',
     roomCode: '123456',
+    mode: 'base',
     sessionPhase: 'ready',
     sessionDetail: null,
     transportStatus: 'connected',

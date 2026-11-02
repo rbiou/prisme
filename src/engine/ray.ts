@@ -84,7 +84,7 @@ function stateKey(position: Point, direction: Point): string {
 }
 
 function addHit(hits: RayHit[], colors: Set<GemColor>, piece: PlacedPiece, point: Point): void {
-  colors.add(piece.color);
+  if (piece.color) colors.add(piece.color);
   hits.push({ pieceId: piece.id, color: piece.color, point });
 }
 
@@ -101,8 +101,18 @@ export function simulateRay(mine: Mine, entry: Entry, options: RayOptions = {}):
   const startEdge = findStartEdge(mine, position);
   if (startEdge) {
     addHit(hits, colors, startEdge.piece, position);
-    direction = reflectDirection(direction, startEdge.start, startEdge.end);
     steps += 1;
+    if (startEdge.piece.kind === 'black-body') {
+      return {
+        status: 'absorbed',
+        entry,
+        color: mixColors(colors),
+        hits,
+        path,
+        steps,
+      };
+    }
+    direction = reflectDirection(direction, startEdge.start, startEdge.end);
     path.push(position);
     const boundary = boardBoundaryHit(position, direction, BOARD_WIDTH, BOARD_HEIGHT);
     path.push(boundary.point);
@@ -140,8 +150,20 @@ export function simulateRay(mine: Mine, entry: Entry, options: RayOptions = {}):
     position = nearest.point;
     path.push(position);
     addHit(hits, colors, nearest.edge.piece, position);
-    direction = reflectDirection(direction, nearest.edge.start, nearest.edge.end);
     steps += 1;
+
+    if (nearest.edge.piece.kind === 'black-body') {
+      return {
+        status: 'absorbed',
+        entry,
+        color: mixColors(colors),
+        hits,
+        path,
+        steps,
+      };
+    }
+
+    direction = reflectDirection(direction, nearest.edge.start, nearest.edge.end);
 
     if (steps > maxReflections) {
       return {
@@ -195,6 +217,9 @@ export function hitPieceIds(results: RayResult[]): Set<PieceKind> {
 export function raySummary(result: RayResult): string {
   if (result.status === 'loop') {
     return `Boucle depuis ${result.entry.label}`;
+  }
+  if (result.status === 'absorbed') {
+    return `Signal absorbé depuis ${result.entry.label}`;
   }
   const exit = result.exit?.label ?? '?';
   return `${result.entry.label} → ${exit}`;

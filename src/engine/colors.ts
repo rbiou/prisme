@@ -1,4 +1,4 @@
-import type { GemColor, RayColor } from './types';
+import type { GemColor, NoteColor, RayColor, SpecialPieceKind } from './types';
 
 export const GEM_COLOR_BITS: Record<GemColor, number> = {
   red: 1,
@@ -14,6 +14,44 @@ export const GEM_COLOR_LABELS: Record<GemColor, string> = {
   yellow: 'Jaune',
   blue: 'Bleu',
   white: 'Blanc',
+};
+
+export const SPECIAL_COLOR_LABELS: Record<SpecialPieceKind, string> = {
+  'clear-diamond': 'Diamant',
+  'black-body': 'Corps noir',
+};
+
+/** Couleurs de rendu des gemmes, y compris les deux gemmes spéciales. */
+export const GEM_COLOR_SWATCHES: Record<GemColor, string> = {
+  red: '#ef4444',
+  yellow: '#facc15',
+  blue: '#3b82f6',
+  white: '#e2e8f0',
+};
+
+export const SPECIAL_COLOR_SWATCHES: Record<SpecialPieceKind, string> = {
+  'clear-diamond': '#e0f2fe',
+  'black-body': '#0b0b0f',
+};
+
+/** Palette des notes privées : gemmes de base et gemmes spéciales. */
+export const NOTE_COLORS: NoteColor[] = [
+  'red',
+  'yellow',
+  'blue',
+  'white',
+  'clear-diamond',
+  'black-body',
+];
+
+export const NOTE_COLOR_LABELS: Record<NoteColor, string> = {
+  ...GEM_COLOR_LABELS,
+  ...SPECIAL_COLOR_LABELS,
+};
+
+export const NOTE_COLOR_SWATCHES: Record<NoteColor, string> = {
+  ...GEM_COLOR_SWATCHES,
+  ...SPECIAL_COLOR_SWATCHES,
 };
 
 export const RAY_COLOR_LABELS: Record<RayColor, string> = {
@@ -100,4 +138,12 @@ export function isRayColor(value: string): value is RayColor {
 
 export function isGemColor(value: string): value is GemColor {
   return value in GEM_COLOR_LABELS;
+}
+
+export function isSpecialColor(value: string): value is SpecialPieceKind {
+  return value in SPECIAL_COLOR_LABELS;
+}
+
+export function isNoteColor(value: string): value is NoteColor {
+  return value in NOTE_COLOR_LABELS;
 }

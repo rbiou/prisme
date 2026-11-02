@@ -2,8 +2,22 @@ export type PlayerId = 'host' | 'guest';
 
 export type GemColor = 'red' | 'yellow' | 'blue' | 'white';
 
+/** Les deux gemmes de l’extension. Elles n’ont pas de couleur de mélange. */
+export type SpecialPieceKind = 'clear-diamond' | 'black-body';
+
 export type PieceKind =
-  'red-parallelogram' | 'yellow-triangle' | 'blue-triangle' | 'white-triangle' | 'white-diamond';
+  | 'red-parallelogram'
+  | 'yellow-triangle'
+  | 'blue-triangle'
+  | 'white-triangle'
+  | 'white-diamond'
+  | SpecialPieceKind;
+
+/** Mode de partie choisi par l’hôte. */
+export type GameMode = 'base' | 'special';
+
+/** Couleur utilisable dans les notes privées : les quatre gemmes de base et les deux spéciales. */
+export type NoteColor = GemColor | SpecialPieceKind;
 
 export type Rotation = 0 | 1 | 2 | 3;
 
@@ -28,7 +42,8 @@ export interface Entry {
 export interface PlacedPiece {
   id: PieceKind;
   kind: PieceKind;
-  color: GemColor;
+  /** `null` pour le diamant et le corps noir. */
+  color: GemColor | null;
   rotation: Rotation;
   x: number;
   y: number;
@@ -51,7 +66,7 @@ export interface SerializedMine {
   pieces: SerializedPiece[];
 }
 
-/** Notes privées : de zéro à cinq pièces candidates, sans obligation de complétude. */
+/** Notes privées : de zéro à sept pièces candidates, sans obligation de complétude. */
 export interface SerializedNote {
   version: 1;
   pieces: SerializedPiece[];
@@ -77,11 +92,11 @@ export type RayColor =
 
 export interface RayHit {
   pieceId: PieceKind;
-  color: GemColor;
+  color: GemColor | null;
   point: Point;
 }
 
-export type RayStatus = 'exit' | 'loop';
+export type RayStatus = 'exit' | 'loop' | 'absorbed';
 
 export interface RayResult {
   status: RayStatus;
@@ -121,6 +136,8 @@ export interface ValidationResult {
 }
 
 export interface ValidationOptions {
+  /** Mode attendu : cinq gemmes de base ou sept avec les deux spéciales. */
+  mode?: GameMode;
   /** Interdit la symétrie parfaite des deux gemmes blanches (règle 2025). */
   enforceWhiteSymmetry?: boolean;
   /** Vérifie que chaque gemme est atteinte par au moins un rayon. */
@@ -133,13 +150,15 @@ export interface ValidationOptions {
 
 export interface CellScanArea {
   pieceId: PieceKind;
-  color: GemColor;
+  color: GemColor | null;
+  special: SpecialPieceKind | null;
   area: number;
 }
 
 export interface CellScanResult {
   cell: Cell;
   color: GemColor | null;
+  special: SpecialPieceKind | null;
   pieceId: PieceKind | null;
   areas: CellScanArea[];
 }
@@ -162,13 +181,23 @@ export interface PendingScan {
   cell?: Cell;
 }
 
+export type WaveScanAnswer =
+  | { kind: 'wave'; absorbed: true }
+  | { kind: 'wave'; absorbed?: false; exit: Entry; color: RayColor };
+
+export type CellScanAnswer =
+  | { kind: 'cell'; color: GemColor | null; special?: null }
+  | { kind: 'cell'; special: SpecialPieceKind; color?: null };
+
+export type ScanAnswer = WaveScanAnswer | CellScanAnswer;
+
 export interface ScanRecord {
   id: string;
   by: PlayerId;
   kind: 'wave' | 'cell';
   entry?: Entry;
   cell?: Cell;
-  answer: { kind: 'wave'; exit: Entry; color: RayColor } | { kind: 'cell'; color: GemColor | null };
+  answer: ScanAnswer;
   confirmationOf?: string;
   createdAt: number;
 }
@@ -194,6 +223,7 @@ export interface PendingSubmission {
 }
 
 export interface GameState {
+  mode: GameMode;
   phase: GamePhase;
   starter: PlayerId;
   turn: PlayerId;

@@ -1,9 +1,20 @@
 import { cellCenter, cellPolygon, pointInPolygon, polygonIntersectionArea } from './geometry';
-import { PIECE_ORDER, piecePolygon } from './pieces';
-import type { Cell, CellScanArea, CellScanResult, Mine, PieceKind } from './types';
+import { isSpecialPieceKind, PIECE_ORDER, piecePolygon } from './pieces';
+import type {
+  Cell,
+  CellScanArea,
+  CellScanResult,
+  Mine,
+  PieceKind,
+  SpecialPieceKind,
+} from './types';
 
 function priority(kind: PieceKind): number {
   return PIECE_ORDER.indexOf(kind);
+}
+
+function specialForKind(kind: PieceKind): SpecialPieceKind | null {
+  return isSpecialPieceKind(kind) ? kind : null;
 }
 
 export function scanCell(mine: Mine, cell: Cell): CellScanResult {
@@ -15,7 +26,12 @@ export function scanCell(mine: Mine, cell: Cell): CellScanResult {
     const polygon = piecePolygon(piece);
     const area = polygonIntersectionArea(cellShape, polygon);
     if (area > 1e-7) {
-      areas.push({ pieceId: piece.id, color: piece.color, area });
+      areas.push({
+        pieceId: piece.id,
+        color: piece.color,
+        special: specialForKind(piece.kind),
+        area,
+      });
     }
   }
 
@@ -26,7 +42,7 @@ export function scanCell(mine: Mine, cell: Cell): CellScanResult {
 
   const best = areas[0];
   if (!best) {
-    return { cell, color: null, pieceId: null, areas: [] };
+    return { cell, color: null, special: null, pieceId: null, areas: [] };
   }
 
   const tied = areas.filter((entry) => Math.abs(entry.area - best.area) <= 1e-7);
@@ -47,6 +63,7 @@ export function scanCell(mine: Mine, cell: Cell): CellScanResult {
   return {
     cell,
     color: chosen.color,
+    special: chosen.special,
     pieceId: chosen.pieceId,
     areas,
   };

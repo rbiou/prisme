@@ -1,11 +1,11 @@
 import { isCell } from './board';
-import { isGemColor } from './colors';
-import type { Cell, GemColor } from './types';
+import { isNoteColor } from './colors';
+import type { Cell, NoteColor } from './types';
 
-/** Note « cette case contient une gemme de cette couleur, forme inconnue ». */
+/** Note « cette case contient une gemme de cette couleur ou de ce type spécial ». */
 export interface ColorMark {
   cell: Cell;
-  color: GemColor;
+  color: NoteColor;
 }
 
 export function sameCell(a: Cell, b: Cell): boolean {
@@ -20,7 +20,7 @@ export function colorMarkAt(marks: ColorMark[], cell: Cell): ColorMark | undefin
  * Pose, recolore ou retire un rond. Toucher la même case avec la même couleur
  * retire le rond ; avec une autre couleur, elle le recolore.
  */
-export function upsertColorMark(marks: ColorMark[], cell: Cell, color: GemColor): ColorMark[] {
+export function upsertColorMark(marks: ColorMark[], cell: Cell, color: NoteColor): ColorMark[] {
   const existing = colorMarkAt(marks, cell);
   if (existing && existing.color === color) {
     return marks.filter((mark) => mark !== existing);
@@ -38,5 +38,5 @@ export function isColorMark(value: unknown): value is ColorMark {
   const cell = candidate.cell as { col?: unknown; row?: unknown };
   if (typeof cell.col !== 'number' || typeof cell.row !== 'number') return false;
   if (!isCell({ col: cell.col, row: cell.row })) return false;
-  return typeof candidate.color === 'string' && isGemColor(candidate.color);
+  return typeof candidate.color === 'string' && isNoteColor(candidate.color);
 }

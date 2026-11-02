@@ -5,14 +5,19 @@ import {
 } from 'react';
 import { cellLabel, parseCellLabel } from '../engine/board';
 import { colorMarkAt, upsertColorMark, type ColorMark } from '../engine/colorMarks';
-import { GEM_COLORS, GEM_COLOR_LABELS } from '../engine/colors';
+import {
+  GEM_COLOR_LABELS,
+  NOTE_COLORS,
+  NOTE_COLOR_LABELS,
+  NOTE_COLOR_SWATCHES,
+} from '../engine/colors';
 import { upsertNoteEdge, type CellEdgeSide, type NoteEdgeMark } from '../engine/noteEdges';
 import {
-  BASE_PIECE_KINDS,
-  PIECE_ORDER,
   colorForKind,
   createPiece,
+  isSpecialPieceKind,
   labelForKind,
+  pieceKindsForMode,
   shapeFor,
 } from '../engine/pieces';
 import {
@@ -26,8 +31,9 @@ import {
 import { removePiece, upsertPiece } from '../engine/mine';
 import type {
   Cell,
-  GemColor,
+  GameMode,
   Mine,
+  NoteColor,
   PieceKind,
   PlacedPiece,
   Point,
@@ -37,12 +43,13 @@ import type {
 import { Board } from './Board';
 import { fr } from '../i18n/fr';
 
-const GEM_FILL: Record<string, string> = {
-  red: '#ef4444',
-  yellow: '#facc15',
-  blue: '#3b82f6',
-  white: '#e2e8f0',
-};
+const GEM_FILL: Record<string, string> = NOTE_COLOR_SWATCHES;
+
+function kindColorLabel(kind: PieceKind): string {
+  return isSpecialPieceKind(kind)
+    ? 'Gemme spéciale'
+    : GEM_COLOR_LABELS[colorForKind(kind) ?? 'white'];
+}
 
 const EDGE_SIDE_OPTIONS: Array<{ value: CellEdgeSide; label: string; name: string }> = [
   { value: 'top', label: fr.placement.edgeTop, name: fr.placement.edgeTop },
@@ -65,7 +72,9 @@ export function GemPreview({
   const shape = shapeFor(kind, rotation);
   const maxX = Math.max(...shape.map((point) => point.x));
   const maxY = Math.max(...shape.map((point) => point.y));
-  const fill = GEM_FILL[colorForKind(kind)] ?? '#e2e8f0';
+  const color = colorForKind(kind);
+  const fill = color ? GEM_FILL[color] : isSpecialPieceKind(kind) ? GEM_FILL[kind] : '#e2e8f0';
+  const stroke = kind === 'clear-diamond' ? '#7dd3fc' : '#0b1220';
   return (
     <svg
       viewBox={`-0.25 -0.25 ${maxX + 0.5} ${maxY + 0.5}`}
@@ -76,11 +85,21 @@ export function GemPreview({
       <polygon
         points={shape.map((point) => `${point.x},${point.y}`).join(' ')}
         fill={fill}
-        fillOpacity="0.9"
-        stroke="#0b1220"
+        fillOpacity={kind === 'black-body' ? '1' : '0.9'}
+        stroke={stroke}
         strokeWidth="0.08"
         strokeLinejoin="round"
       />
+      {kind === 'clear-diamond' ? (
+        <polygon
+          points={shape.map((point) => `${point.x},${point.y}`).join(' ')}
+          fill="none"
+          stroke="#e0f2fe"
+          strokeOpacity="0.6"
+          strokeWidth="0.18"
+          strokeLinejoin="round"
+        />
+      ) : null}
     </svg>
   );
 }
@@ -100,6 +119,8 @@ interface DragState {
 export interface MineComposerProps {
   mine: Mine;
   onChange: (mine: Mine) => void;
+  /** Mode de la partie : cinq gemmes de base ou sept avec les spéciales. */
+  mode?: GameMode;
   disabled?: boolean;
   boardAriaLabel?: string;
   selectedKind?: PieceKind;
@@ -129,6 +150,7 @@ export interface MineComposerProps {
 export function MineComposer({
   mine,
   onChange,
+  mode = 'base',
   disabled = false,
   boardAriaLabel,
   selectedKind,
@@ -155,7 +177,7 @@ export function MineComposer({
   const [coordinate, setCoordinate] = useState('');
   const [internalTool, setInternalTool] = useState<NoteTool>(onScanCell ? 'scan' : 'piece');
   const [edgeSide, setEdgeSide] = useState<CellEdgeSide>('top');
-  const [markColor, setMarkColor] = useState<GemColor>('red');
+  const [markColor, setMarkColor] = useState<NoteColor>('red');
   const [drag, setDrag] = useState<DragState | null>(null);
   const [hover, setHover] = useState<PieceOrigin | null>(null);
 
@@ -168,6 +190,7 @@ export function MineComposer({
   }
 
   const activeKind = selectedKind ?? internalKind;
+  const paletteKinds = pieceKindsForMode(mode);
   const placed = mine.pieces.find((piece) => piece.kind === activeKind);
   const scanMode = tool === 'scan';
   const crossMode = Boolean(onCrossesChange) && tool === 'cross';
@@ -451,7 +474,7 @@ export function MineComposer({
   return (
     <div className="mine-composer">
       <div className="palette" role="group" aria-label={fr.placement.palette}>
-        {PIECE_ORDER.map((kind) => {
+        {paletteKinds.map((kind) => {
           const isPlaced = mine.pieces.some((piece) => piece.kind === kind);
           return (
             <button
@@ -464,9 +487,7 @@ export function MineComposer({
             >
               <GemPreview kind={kind} rotation={activeKind === kind ? rotation : 0} />
               <span className="palette-label">{labelForKind(kind)}</span>
-              <span className="palette-meta">
-                {isPlaced ? 'placée' : GEM_COLOR_LABELS[colorForKind(kind)]}
-              </span>
+              <span className="palette-meta">{isPlaced ? 'placée' : kindColorLabel(kind)}</span>
             </button>
           );
         })}
@@ -630,7 +651,7 @@ export function MineComposer({
           <div className="edge-group">
             <span className="edge-group-label">{fr.placement.edgeColor}</span>
             <div className="edge-options" role="group" aria-label={fr.placement.edgeColor}>
-              {GEM_COLORS.map((color) => (
+              {NOTE_COLORS.map((color) => (
                 <button
                   key={color}
                   type="button"
@@ -641,10 +662,10 @@ export function MineComposer({
                 >
                   <span
                     className="edge-color-swatch"
-                    style={{ backgroundColor: GEM_FILL[color] }}
+                    style={{ backgroundColor: NOTE_COLOR_SWATCHES[color] }}
                     aria-hidden="true"
                   />
-                  <span>{GEM_COLOR_LABELS[color]}</span>
+                  <span>{NOTE_COLOR_LABELS[color]}</span>
                 </button>
               ))}
             </div>
@@ -733,13 +754,14 @@ export function MineComposer({
         <p className="visually-hidden">
           Ronds de couleur :{' '}
           {colorMarks
-            .map((mark) => `${GEM_COLOR_LABELS[mark.color]} en ${cellLabel(mark.cell)}`)
+            .map((mark) => `${NOTE_COLOR_LABELS[mark.color]} en ${cellLabel(mark.cell)}`)
             .join(' ; ')}
           .
         </p>
       ) : null}
       <p className="visually-hidden">
-        {BASE_PIECE_KINDS.length} gemmes : rouge, jaune, bleue, triangle blanc et losange blanc.
+        {paletteKinds.length} gemmes :{' '}
+        {paletteKinds.map((kind) => labelForKind(kind).toLowerCase()).join(', ')}.
       </p>
     </div>
   );

@@ -1,16 +1,18 @@
 import { BOARD_HEIGHT, BOARD_WIDTH, isCell } from './board';
 import { polygonsEqual } from './geometry';
 import {
-  BASE_PIECE_KINDS,
+  ALL_PIECE_KINDS,
   canonicalRotation,
   colorForKind,
   isPieceKind,
   isRotation,
   PIECE_ORDER,
+  pieceKindsForMode,
   piecePolygon,
 } from './pieces';
 import { validatePieces } from './placement';
 import type {
+  GameMode,
   Mine,
   PieceKind,
   PlacedPiece,
@@ -43,10 +45,11 @@ export function getPiece(mine: Mine, kind: PieceKind): PlacedPiece | undefined {
   return mine.pieces.find((piece) => piece.kind === kind);
 }
 
-export function isCompleteMine(mine: Mine): boolean {
-  if (mine.pieces.length !== BASE_PIECE_KINDS.length) return false;
+export function isCompleteMine(mine: Mine, mode: GameMode = 'base'): boolean {
+  const expected = pieceKindsForMode(mode);
+  if (mine.pieces.length !== expected.length) return false;
   const kinds = new Set(mine.pieces.map((piece) => piece.kind));
-  return BASE_PIECE_KINDS.every((kind) => kinds.has(kind));
+  return expected.every((kind) => kinds.has(kind));
 }
 
 export function serializeMine(mine: Mine): SerializedMine {
@@ -83,24 +86,35 @@ function isSerializedPieceValue(value: unknown, seen: Set<PieceKind>): boolean {
   return true;
 }
 
-export function isSerializedMine(value: unknown): value is SerializedMine {
+function serializedMineForMode(value: unknown, mode: GameMode): value is SerializedMine {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as { version?: unknown; pieces?: unknown };
   if (candidate.version !== 1 || !Array.isArray(candidate.pieces)) return false;
-  if (candidate.pieces.length !== BASE_PIECE_KINDS.length) return false;
+  const expected = pieceKindsForMode(mode);
+  if (candidate.pieces.length !== expected.length) return false;
 
   const seen = new Set<PieceKind>();
   for (const item of candidate.pieces) {
     if (!isSerializedPieceValue(item, seen)) return false;
   }
-  return BASE_PIECE_KINDS.every((kind) => seen.has(kind));
+  return expected.every((kind) => seen.has(kind));
+}
+
+export function isSerializedMine(
+  value: unknown,
+  mode: GameMode | 'any' = 'base',
+): value is SerializedMine {
+  if (mode === 'any') {
+    return serializedMineForMode(value, 'base') || serializedMineForMode(value, 'special');
+  }
+  return serializedMineForMode(value, mode);
 }
 
 export function isSerializedNote(value: unknown): value is SerializedNote {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as { version?: unknown; pieces?: unknown };
   if (candidate.version !== 1 || !Array.isArray(candidate.pieces)) return false;
-  if (candidate.pieces.length > BASE_PIECE_KINDS.length) return false;
+  if (candidate.pieces.length > ALL_PIECE_KINDS.length) return false;
   const seen = new Set<PieceKind>();
   for (const item of candidate.pieces) {
     if (!isSerializedPieceValue(item, seen)) return false;
@@ -175,12 +189,17 @@ export interface SolutionCheck {
   reason?: string;
 }
 
-export function checkSolution(candidate: SerializedMine, mine: Mine): SolutionCheck {
-  if (!isSerializedMine(candidate)) {
+export function checkSolution(
+  candidate: SerializedMine,
+  mine: Mine,
+  mode: GameMode = 'base',
+): SolutionCheck {
+  if (!isSerializedMine(candidate, mode)) {
     return { correct: false, reason: 'La proposition est incomplète ou mal formée.' };
   }
   const candidateMine = deserializeMine(candidate);
   const validation = validatePieces(candidateMine.pieces, {
+    mode,
     requireAll: true,
     requireReachable: false,
     rejectLoops: false,

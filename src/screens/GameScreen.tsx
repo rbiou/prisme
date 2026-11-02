@@ -18,7 +18,7 @@ import {
 import { isNoteEdgeMark, type NoteEdgeMark } from '../engine/noteEdges';
 import { validateMine } from '../engine/placement';
 import { simulateRay } from '../engine/ray';
-import { RAY_COLOR_LABELS } from '../engine/colors';
+import { RAY_COLOR_LABELS, SPECIAL_COLOR_LABELS } from '../engine/colors';
 import type {
   Cell,
   Mine,
@@ -117,6 +117,7 @@ function questionLabel(scan: Pick<ScanRecord, 'kind' | 'entry' | 'cell'>): strin
 
 function privateRayLabel(result: RayResult): string {
   if (result.status === 'loop') return 'Boucle de rayon';
+  if (result.status === 'absorbed') return 'Signal absorbé';
   return `Sortie ${result.exit?.label ?? '?'}`;
 }
 
@@ -174,10 +175,18 @@ function GameJournal({
               </div>
               <div className="journal-answer">
                 {scan.answer.kind === 'wave' ? (
-                  <>
-                    <span className="journal-exit">{scan.answer.exit.label}</span>
-                    <ColorChip color={scan.answer.color} />
-                  </>
+                  scan.answer.absorbed === true ? (
+                    <span className="journal-absorbed">Le signal a été absorbé</span>
+                  ) : (
+                    <>
+                      <span className="journal-exit">{scan.answer.exit.label}</span>
+                      <ColorChip color={scan.answer.color} />
+                    </>
+                  )
+                ) : scan.answer.special ? (
+                  <span className="journal-special">
+                    {SPECIAL_COLOR_LABELS[scan.answer.special]}
+                  </span>
                 ) : (
                   <ColorChip
                     color={scan.answer.color}
@@ -321,11 +330,12 @@ export function GameScreen({
   const notesStructureValidation = useMemo(
     () =>
       validateMine(notes, {
+        mode: game.mode,
         enforceWhiteSymmetry: false,
         requireReachable: false,
         rejectLoops: false,
       }),
-    [notes],
+    [notes, game.mode],
   );
 
   const isMyTurn = game.turn === role;
@@ -395,8 +405,9 @@ export function GameScreen({
     [incomingSubmission],
   );
   const incomingSubmissionVerdict = useMemo(
-    () => (incomingSubmission ? checkSolution(incomingSubmission.candidate, myMine) : null),
-    [incomingSubmission, myMine],
+    () =>
+      incomingSubmission ? checkSolution(incomingSubmission.candidate, myMine, game.mode) : null,
+    [incomingSubmission, myMine, game.mode],
   );
 
   const turnLabel = (() => {
@@ -454,9 +465,12 @@ export function GameScreen({
     if (scan.kind !== 'wave' || !scan.entry || scan.answer.kind !== 'wave') return;
     const result = simulateRay(notes, scan.entry);
     const matches =
-      result.status !== 'loop' &&
-      result.exit?.label === scan.answer.exit.label &&
-      result.color === scan.answer.color;
+      result.status === 'absorbed'
+        ? scan.answer.absorbed === true
+        : result.status !== 'loop' &&
+          scan.answer.absorbed !== true &&
+          result.exit?.label === scan.answer.exit.label &&
+          result.color === scan.answer.color;
     setSimulation({
       scanId: scan.id,
       entryLabel: scan.entry.label,
@@ -593,6 +607,7 @@ export function GameScreen({
               <MineComposer
                 mine={notes}
                 onChange={updateNotes}
+                mode={game.mode}
                 crosses={crosses}
                 onCrossesChange={setCrosses}
                 edgeMarks={edgeMarks}

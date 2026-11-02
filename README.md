@@ -1,11 +1,11 @@
 # Prisme
 
 Jeu de déduction à deux joueurs, en français, jouable sur mobile. Chaque joueur
-cache une mine de cinq gemmes, puis tente de reconstituer celle de l'adversaire
-en tirant des rayons et en interrogeant des cases. Application 100 % frontend,
-pair-à-pair, sans backend propre : un courtier public PeerJS sert uniquement de
-rendez-vous pour le code à six chiffres, puis les données passent en WebRTC
-direct entre les deux navigateurs.
+cache une mine de cinq gemmes — ou de sept avec le mode spécial — puis tente de
+reconstituer celle de l'adversaire en tirant des rayons et en interrogeant des
+cases. Application 100 % frontend, pair-à-pair, sans backend propre : un courtier
+public PeerJS sert uniquement de rendez-vous pour le code à six chiffres, puis
+les données passent en WebRTC direct entre les deux navigateurs.
 
 **Jouer :** [https://rbiou.github.io/prisme/](https://rbiou.github.io/prisme/)
 
@@ -50,7 +50,10 @@ l'invité saisit ce code sur l'accueil.
   `0.peerjs.com` réservent l'identifiant du salon. Dès que le canal est ouvert,
   les échanges de jeu passent directement entre les navigateurs.
 - La mine secrète reste locale. Seuls le point de sortie et la couleur d'un
-  rayon sont échangés.
+  rayon, la mention d'absorption ou le type spécial d'une case sont échangés.
+- Le mode de partie est choisi par l'hôte : cinq gemmes de base, ou sept avec le
+  Diamant et le Corps noir. L'invité suit le mode annoncé et la reprise conserve
+  ce choix.
 - Une coupure est reprise automatiquement : le joueur restant garde le code,
   puis les deux clients resynchronisent l'état public. Après fermeture de
   l'application, un bouton permet de reprendre depuis une sauvegarde locale.
@@ -69,7 +72,8 @@ l'invité saisit ce code sur l'accueil.
   vérification a posteriori permettent de détecter certaines incohérences.
 - Le code à six chiffres n'est pas un secret fort : un tiers peut théoriquement
   deviner un salon. L'hôte voit le nom du joueur avant de lancer la partie.
-- Le MVP couvre uniquement la boîte de base à deux joueurs.
+- Le MVP couvre la boîte de base à deux joueurs et le mode spécial optionnel
+  avec le Diamant et le Corps noir.
 
 ## Déploiement
 

@@ -38,12 +38,13 @@ function parse(value: unknown): NetworkMessage | null {
 
 describe('protocole réseau', () => {
   it('accepte les messages de présentation et de salon', () => {
-    expect(parse(createHello('host', 'René', NONCE_A))).toEqual({
+    expect(parse(createHello('host', 'René', NONCE_A, 'base'))).toEqual({
       protocol: PROTOCOL_VERSION,
       type: 'hello',
       from: 'host',
       name: 'René',
       nonce: NONCE_A,
+      mode: 'base',
     });
     expect(parse(createCommit('guest', HASH_B, 'commit-1'))).toEqual({
       protocol: PROTOCOL_VERSION,
@@ -52,13 +53,14 @@ describe('protocole réseau', () => {
       from: 'guest',
       mineHash: HASH_B,
     });
-    expect(parse(createLobbyStart('start-1'))).toEqual({
+    expect(parse(createLobbyStart('base', 'start-1'))).toEqual({
       protocol: PROTOCOL_VERSION,
       type: 'lobby-start',
       id: 'start-1',
       from: 'host',
+      mode: 'base',
     });
-    expect(parse(createStart(NONCE_A, NONCE_B, HASH_A, HASH_B))).toMatchObject({
+    expect(parse(createStart(NONCE_A, NONCE_B, HASH_A, HASH_B, 'base'))).toMatchObject({
       type: 'start',
       from: 'host',
       starter: 'host',
@@ -66,20 +68,23 @@ describe('protocole réseau', () => {
       guestNonce: NONCE_B,
       hostHash: HASH_A,
       guestHash: HASH_B,
+      mode: 'base',
     });
   });
 
   it('refuse une présentation ou un engagement mal formé', () => {
-    expect(parse({ ...createHello('host', 'X', NONCE_A), nonce: 'abc' })).toBeNull();
-    expect(parse({ ...createHello('host', 'X', NONCE_A), from: 'autre' })).toBeNull();
-    expect(parse({ ...createHello('host', 'X', NONCE_A), name: 'x'.repeat(41) })).toBeNull();
+    expect(parse({ ...createHello('host', 'X', NONCE_A, 'base'), nonce: 'abc' })).toBeNull();
+    expect(parse({ ...createHello('host', 'X', NONCE_A, 'base'), from: 'autre' })).toBeNull();
+    expect(
+      parse({ ...createHello('host', 'X', NONCE_A, 'base'), name: 'x'.repeat(41) }),
+    ).toBeNull();
     expect(parse({ ...createCommit('host', HASH_A), mineHash: 'zz' })).toBeNull();
     expect(parse({ ...createCommit('host', HASH_A), id: '' })).toBeNull();
-    expect(parse({ ...createLobbyStart(), from: 'guest' })).toBeNull();
+    expect(parse({ ...createLobbyStart('base'), from: 'guest' })).toBeNull();
   });
 
   it('refuse un démarrage incohérent', () => {
-    const start = createStart(NONCE_A, NONCE_B, HASH_A, HASH_B)!;
+    const start = createStart(NONCE_A, NONCE_B, HASH_A, HASH_B, 'base')!;
     expect(parse({ ...start, from: 'guest' })).toBeNull();
     expect(parse({ ...start, starter: 'autre' })).toBeNull();
     expect(parse({ ...start, hostHash: 'court' })).toBeNull();
@@ -203,6 +208,58 @@ describe('protocole réseau', () => {
     expect(parse({ ...wave, exit: 'Z' })).toBeNull();
   });
 
+  it('accepte les réponses absorbées et les cellules spéciales', () => {
+    const absorbed = {
+      protocol: PROTOCOL_VERSION,
+      type: 'answer',
+      id: 'answer-absorbed',
+      from: 'guest',
+      scanId: 'scan-1',
+      kind: 'wave',
+      absorbed: true,
+    };
+    const special = {
+      protocol: PROTOCOL_VERSION,
+      type: 'answer',
+      id: 'answer-special',
+      from: 'guest',
+      scanId: 'scan-2',
+      kind: 'cell',
+      special: 'black-body',
+    };
+    expect(parse(absorbed)).toEqual(absorbed);
+    expect(parse(special)).toEqual(special);
+    expect(parse({ ...absorbed, exit: 'I' })).toBeNull();
+    expect(parse({ ...absorbed, color: 'white' })).toBeNull();
+    expect(parse({ ...special, color: 'white' })).toBeNull();
+    expect(parse({ ...special, special: 'inconnu' })).toBeNull();
+  });
+
+  it('accepte les confirmations absorbées et spéciales', () => {
+    const absorbed = {
+      protocol: PROTOCOL_VERSION,
+      type: 'confirm-result',
+      id: 'c-absorbed',
+      from: 'guest',
+      answerId: 'answer-1',
+      kind: 'wave',
+      absorbed: true,
+    };
+    const special = {
+      protocol: PROTOCOL_VERSION,
+      type: 'confirm-result',
+      id: 'c-special',
+      from: 'guest',
+      answerId: 'answer-2',
+      kind: 'cell',
+      special: 'clear-diamond',
+    };
+    expect(parse(absorbed)).toEqual(absorbed);
+    expect(parse(special)).toEqual(special);
+    expect(parse({ ...absorbed, exit: 'I' })).toBeNull();
+    expect(parse({ ...special, color: 'red' })).toBeNull();
+  });
+
   it('accepte les confirmations, annulations et pings', () => {
     const messages = [
       {
@@ -245,6 +302,45 @@ describe('protocole réseau', () => {
     for (const message of messages) {
       expect(parse(message)).toEqual(message);
     }
+  });
+
+  it('accepte une mine spéciale dans une proposition, une révélation et une synchronisation', () => {
+    const specialMine: SerializedMine = {
+      version: 1,
+      pieces: [
+        ...CANDIDATE.pieces,
+        { kind: 'clear-diamond', rotation: 0, x: 8, y: 0 },
+        { kind: 'black-body', rotation: 0, x: 8, y: 2 },
+      ],
+    };
+    const submit = {
+      protocol: PROTOCOL_VERSION,
+      type: 'submit',
+      id: 's-special',
+      from: 'host',
+      candidate: specialMine,
+    };
+    const reveal = {
+      protocol: PROTOCOL_VERSION,
+      type: 'reveal',
+      id: 'r-special',
+      from: 'guest',
+      mine: specialMine,
+      salt: SALT,
+    };
+    const sync = createSync('host', {
+      round: 1,
+      mineHash: HASH_A,
+      starter: 'host',
+      game: createGame('host', 'special'),
+      reveals: [],
+    });
+    expect(parse(submit)).toEqual(submit);
+    expect(parse(reveal)).toEqual(reveal);
+    expect(parse(sync)).toMatchObject({ type: 'sync', game: { mode: 'special' } });
+    expect(
+      parse({ ...submit, candidate: { ...specialMine, pieces: specialMine.pieces.slice(0, 6) } }),
+    ).toBeNull();
   });
 
   it('accepte une proposition complète et un résultat', () => {
@@ -298,8 +394,8 @@ describe('protocole réseau', () => {
     const odd = '0'.repeat(31) + '1';
     expect(chooseStarter(odd, '0'.repeat(32))).toBe('guest');
     expect(chooseStarter('x', NONCE_B)).toBeNull();
-    expect(createStart('x', NONCE_B, HASH_A, HASH_B)).toBeNull();
-    expect(createStart(NONCE_A, NONCE_B, 'x', HASH_B)).toBeNull();
+    expect(createStart('x', NONCE_B, HASH_A, HASH_B, 'base')).toBeNull();
+    expect(createStart(NONCE_A, NONCE_B, 'x', HASH_B, 'base')).toBeNull();
   });
 
   it('génère des identifiants de message courts et uniques', () => {

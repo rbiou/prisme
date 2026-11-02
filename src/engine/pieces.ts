@@ -1,15 +1,23 @@
 import { polygonKey, rotatePolygon, translatePolygon } from './geometry';
-import type { GemColor, PieceKind, PlacedPiece, Point, Rotation } from './types';
+import type {
+  GameMode,
+  GemColor,
+  PieceKind,
+  PlacedPiece,
+  Point,
+  Rotation,
+  SpecialPieceKind,
+} from './types';
 
 export interface PieceDefinition {
   kind: PieceKind;
-  color: GemColor;
+  color: GemColor | null;
   label: string;
   base: Point[];
   rotations: Point[][];
 }
 
-const BASE_SHAPES: Record<PieceKind, { color: GemColor; label: string; points: Point[] }> = {
+const BASE_SHAPES: Record<PieceKind, { color: GemColor | null; label: string; points: Point[] }> = {
   'red-parallelogram': {
     color: 'red',
     label: 'Parallélogramme rouge',
@@ -57,6 +65,27 @@ const BASE_SHAPES: Record<PieceKind, { color: GemColor; label: string; points: P
       { x: 0, y: 1 },
     ],
   },
+  // Les deux gemmes spéciales occupent un rectangle de 2 cases sur 1.
+  'clear-diamond': {
+    color: null,
+    label: 'Diamant',
+    points: [
+      { x: 0, y: 0 },
+      { x: 2, y: 0 },
+      { x: 2, y: 1 },
+      { x: 0, y: 1 },
+    ],
+  },
+  'black-body': {
+    color: null,
+    label: 'Corps noir',
+    points: [
+      { x: 0, y: 0 },
+      { x: 2, y: 0 },
+      { x: 2, y: 1 },
+      { x: 0, y: 1 },
+    ],
+  },
 };
 
 export const PIECE_ORDER: PieceKind[] = [
@@ -65,9 +94,27 @@ export const PIECE_ORDER: PieceKind[] = [
   'blue-triangle',
   'white-triangle',
   'white-diamond',
+  'clear-diamond',
+  'black-body',
 ];
 
-export const BASE_PIECE_KINDS: readonly PieceKind[] = PIECE_ORDER;
+export const BASE_PIECE_KINDS: readonly PieceKind[] = PIECE_ORDER.slice(0, 5);
+
+export const SPECIAL_PIECE_KINDS: readonly SpecialPieceKind[] = ['clear-diamond', 'black-body'];
+
+export const ALL_PIECE_KINDS: readonly PieceKind[] = PIECE_ORDER;
+
+export function pieceKindsForMode(mode: GameMode): readonly PieceKind[] {
+  return mode === 'special' ? PIECE_ORDER : BASE_PIECE_KINDS;
+}
+
+export function isGameMode(value: unknown): value is GameMode {
+  return value === 'base' || value === 'special';
+}
+
+export function isSpecialPieceKind(value: string): value is SpecialPieceKind {
+  return (SPECIAL_PIECE_KINDS as readonly string[]).includes(value);
+}
 
 export const PIECE_DEFINITIONS: Record<PieceKind, PieceDefinition> = Object.fromEntries(
   PIECE_ORDER.map((kind) => {
@@ -94,7 +141,7 @@ export function isRotation(value: number): value is Rotation {
   return value === 0 || value === 1 || value === 2 || value === 3;
 }
 
-export function colorForKind(kind: PieceKind): GemColor {
+export function colorForKind(kind: PieceKind): GemColor | null {
   return PIECE_DEFINITIONS[kind].color;
 }
 
@@ -143,9 +190,9 @@ export function pieceBoundingBox(piece: PlacedPiece) {
 }
 
 /**
- * Certaines rotations produisent exactement le même polygone (parallélogramme
- * et losange). On normalise vers la plus petite rotation équivalente pour que
- * l'engagement et la comparaison de solution soient stables.
+ * Certaines rotations produisent exactement le même polygone (parallélogramme,
+ * losange et rectangle). On normalise vers la plus petite rotation équivalente
+ * pour que l’engagement et la comparaison de solution soient stables.
  */
 export function canonicalRotation(kind: PieceKind, rotation: Rotation): Rotation {
   const target = polygonKey(shapeFor(kind, rotation));

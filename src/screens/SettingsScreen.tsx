@@ -15,7 +15,8 @@ export function SettingsScreen({ settings, onChange, onBack }: SettingsScreenPro
           <p className="kicker">Préférences locales</p>
           <h1>{fr.settings.title}</h1>
           <p className="lead">
-            Ces réglages restent sur cet appareil et ne sont jamais transmis à l’adversaire.
+            Ces préférences restent sur cet appareil. Seul le mode de partie choisi par l’hôte est
+            annoncé à l’adversaire.
           </p>
         </div>
         <button type="button" className="btn btn--ghost" onClick={onBack}>
@@ -24,6 +25,43 @@ export function SettingsScreen({ settings, onChange, onBack }: SettingsScreenPro
       </div>
 
       <div className="settings-grid">
+        <section className="card card--plain setting-item">
+          <div className="setting-copy">
+            <h2>{fr.settings.gameMode}</h2>
+            <p>{fr.settings.gameModeHint}</p>
+          </div>
+          <fieldset className="mode-choices">
+            <legend className="visually-hidden">{fr.settings.gameMode}</legend>
+            <label className={`mode-choice${settings.gameMode === 'base' ? ' is-active' : ''}`}>
+              <input
+                type="radio"
+                name="game-mode"
+                value="base"
+                checked={settings.gameMode === 'base'}
+                onChange={() => onChange({ gameMode: 'base' })}
+              />
+              <span>
+                <strong>{fr.settings.gameModeBase}</strong>
+                <span>{fr.settings.gameModeBaseHint}</span>
+              </span>
+            </label>
+            <label className={`mode-choice${settings.gameMode === 'special' ? ' is-active' : ''}`}>
+              <input
+                type="radio"
+                name="game-mode"
+                value="special"
+                checked={settings.gameMode === 'special'}
+                onChange={() => onChange({ gameMode: 'special' })}
+              />
+              <span>
+                <strong>{fr.settings.gameModeSpecial}</strong>
+                <span>{fr.settings.gameModeSpecialHint}</span>
+              </span>
+            </label>
+          </fieldset>
+          <p className="fine-print">{fr.settings.gameModeGuest}</p>
+        </section>
+
         <section className="card card--plain setting-item">
           <div className="setting-copy">
             <h2>{fr.settings.whiteSymmetry}</h2>

@@ -111,4 +111,23 @@ describe('rayons', () => {
     expect(entryRay(entry('11')).origin).toEqual({ x: 10, y: 0.5 });
     expect(ALL_ENTRIES).toHaveLength(36);
   });
+
+  it('réfléchit sur le Diamant sans ajouter de couleur', () => {
+    const mine = mineOf([['clear-diamond', 0, 4, 3]]);
+    const result = simulateRay(mine, entry('D'));
+    expect(result.status).toBe('exit');
+    expect(result.exit?.label).toBe('D');
+    expect(result.color).toBe('transparent');
+    expect(result.hits).toHaveLength(1);
+    expect(result.hits[0]).toMatchObject({ pieceId: 'clear-diamond', color: null });
+  });
+
+  it('absorbe le rayon sur le Corps noir', () => {
+    const mine = mineOf([['black-body', 0, 4, 3]]);
+    const result = simulateRay(mine, entry('D'));
+    expect(result.status).toBe('absorbed');
+    expect(result.exit).toBeUndefined();
+    expect(result.color).toBe('transparent');
+    expect(result.hits[0]).toMatchObject({ pieceId: 'black-body', color: null });
+  });
 });

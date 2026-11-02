@@ -3,6 +3,7 @@ import { Board } from '../components/Board';
 import { ColorChip } from '../components/ColorChip';
 import { PrismMark } from '../components/AppHeader';
 import { otherPlayer, endReasonLabel } from '../engine/endgame';
+import { SPECIAL_COLOR_LABELS } from '../engine/colors';
 import { deserializeMine, deserializeNote, serializeMine } from '../engine/mine';
 import type { GameState, Mine, PlayerId } from '../engine/types';
 import { fr } from '../i18n/fr';
@@ -522,10 +523,16 @@ export function ResultScreen({
                 </span>
                 <span>
                   {scan.answer.kind === 'wave' ? (
-                    <>
-                      sortie {scan.answer.exit.label} ·{' '}
-                      <ColorChip color={scan.answer.color} size="small" />
-                    </>
+                    scan.answer.absorbed === true ? (
+                      'Le signal a été absorbé'
+                    ) : (
+                      <>
+                        sortie {scan.answer.exit.label} ·{' '}
+                        <ColorChip color={scan.answer.color} size="small" />
+                      </>
+                    )
+                  ) : scan.answer.special ? (
+                    SPECIAL_COLOR_LABELS[scan.answer.special]
                   ) : (
                     <ColorChip
                       color={scan.answer.color}

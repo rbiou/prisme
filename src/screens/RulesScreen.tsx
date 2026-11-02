@@ -18,6 +18,7 @@ export function RulesScreen({ onBack }: { onBack: () => void }) {
       <nav className="rules-toc" aria-label="Sommaire des règles">
         <a href="#regles-but">But</a>
         <a href="#regles-materiel">Matériel</a>
+        <a href="#regles-speciales">Gemmes spéciales</a>
         <a href="#regles-placement">Placement</a>
         <a href="#regles-rayons">Rayons</a>
         <a href="#regles-tour">Tour</a>
@@ -29,9 +30,10 @@ export function RulesScreen({ onBack }: { onBack: () => void }) {
         <section id="regles-but">
           <h2>1. But du jeu</h2>
           <p>
-            Chaque joueur cache une mine de cinq gemmes. À tour de rôle, vous sondez la mine adverse
-            avec des rayons ou des scans de case, puis vous reconstituéz sa disposition exacte. Le
-            premier à soumettre la bonne mine gagne, selon la procédure de fin de partie.
+            Chaque joueur cache une mine de cinq gemmes, ou de sept si l’hôte a activé les gemmes
+            spéciales. À tour de rôle, vous sondez la mine adverse avec des rayons ou des scans de
+            case, puis vous reconstituéz sa disposition exacte. Le premier à soumettre la bonne mine
+            gagne, selon la procédure de fin de partie.
           </p>
         </section>
 
@@ -47,6 +49,10 @@ export function RulesScreen({ onBack }: { onBack: () => void }) {
               blanche en losange.
             </li>
             <li>
+              En mode spécial, deux gemmes supplémentaires en rectangle de deux cases : le Diamant
+              et le Corps noir.
+            </li>
+            <li>
               Les bords sont étiquetés : <strong>1 à 10</strong> en haut, <strong>11 à 18</strong> à
               droite, <strong>A à H</strong> à gauche et <strong>I à R</strong> en bas.
             </li>
@@ -55,6 +61,33 @@ export function RulesScreen({ onBack }: { onBack: () => void }) {
             Une étiquette désigne le milieu d’une case sur le bord. La case <strong>E4</strong>{' '}
             désigne la colonne 4, ligne E (la cinquième rangée).
           </p>
+        </section>
+
+        <section id="regles-speciales">
+          <h2>2 bis. Gemmes spéciales</h2>
+          <p>
+            Le mode spécial s’active dans les réglages avant de créer la partie. L’hôte choisit le
+            mode ; l’invité suit automatiquement le mode annoncé dans le salon. Le mode de base
+            reste la référence à cinq gemmes.
+          </p>
+          <ul>
+            <li>
+              <strong>Diamant</strong> : un rectangle de deux cases, blanc et brillant. Il réfléchit
+              les rayons comme une gemme, mais n’ajoute aucune couleur au mélange.
+            </li>
+            <li>
+              <strong>Corps noir</strong> : un rectangle de deux cases, noir. Il absorbe le rayon :
+              la réponse est « Le signal a été absorbé » au lieu d’un point de sortie.
+            </li>
+            <li>
+              Un scan de case sur le Diamant répond « Diamant » ; sur le Corps noir, il répond « Le
+              signal a été absorbé ».
+            </li>
+            <li>
+              Les deux spéciales se placent, tournent et se déplacent comme les autres gemmes, avec
+              les mêmes règles de contact, de bord et d’accessibilité.
+            </li>
+          </ul>
         </section>
 
         <section id="regles-placement">
@@ -96,6 +129,10 @@ export function RulesScreen({ onBack }: { onBack: () => void }) {
             <li>Une arête perpendiculaire le renvoie exactement en arrière.</li>
             <li>Une arête parallèle n’est jamais rencontrée dans une mine valide.</li>
             <li>Le rayon sort dès qu’il atteint un bord ; on annonce son étiquette.</li>
+            <li>
+              Le Diamant renvoie le rayon sans ajouter de couleur ; le Corps noir l’absorbe et la
+              réponse s’arrête là.
+            </li>
           </ul>
           <p>
             Le rayon part incolore. Chaque couleur de gemme touchée est ajoutée une seule fois, quel
@@ -115,15 +152,17 @@ export function RulesScreen({ onBack }: { onBack: () => void }) {
           </ul>
           <p>
             Le maître de la mine calcule la réponse localement, la vérifie, puis la confirme. Seuls
-            le point de sortie et la couleur, ou la couleur de la case, sont envoyés. La trajectoire
-            reste privée. Après une réponse confirmée, le tour passe à l’autre joueur.
+            le point de sortie et la couleur, la mention d’absorption ou le type spécial de la case
+            sont envoyés. La trajectoire reste privée. Après une réponse confirmée, le tour passe à
+            l’autre joueur.
           </p>
           <h3>Scan de case</h3>
           <p>
             Une case peut être partiellement couverte par plusieurs gemmes. La réponse retient la
             gemme qui couvre la plus grande surface. En cas d’égalité, le centre de la case tranche
-            ; sinon l’ordre fixe rouge, jaune, bleu, blanc est appliqué. Sans gemme, la réponse est
-            « Rien ».
+            ; sinon l’ordre fixe des gemmes est appliqué. Sans gemme, la réponse est « Rien ». Une
+            gemme spéciale est annoncée par son nom, et le Corps noir par « Le signal a été absorbé
+            ».
           </p>
           <h3>Confirmation gratuite</h3>
           <p>

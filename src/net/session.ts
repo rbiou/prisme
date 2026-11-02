@@ -1,4 +1,4 @@
-import type { PlayerId } from '../engine/types';
+import type { GameMode, PlayerId } from '../engine/types';
 import { isHex } from './integrity';
 import {
   CodeUnavailableError,
@@ -45,10 +45,13 @@ export type SessionPhase =
 export interface LobbyContext {
   remoteName: string;
   remoteNonce: string;
+  /** Mode de la partie : celui de l’hôte, y compris pour l’invité. */
+  mode: GameMode;
 }
 
 export interface ReadyContext {
   starter: PlayerId;
+  mode: GameMode;
   remoteName: string;
   remoteNonce: string;
   remoteMineHash: string;
@@ -70,6 +73,8 @@ export interface SessionHandlers {
 }
 
 export interface MatchSessionOptions {
+  /** Mode local annoncé par l’hôte ; l’invité adopte celui de l’hôte. */
+  mode?: GameMode;
   peerFactory?: PeerFactory;
   joinTimeoutMs?: number;
   handshakeTimeoutMs?: number;
@@ -118,6 +123,7 @@ export class MatchSession {
   private reconnectDeadline: ReturnType<typeof setTimeout> | null = null;
   private phaseBeforeDrop: SessionPhase = 'idle';
   private placementStarted = false;
+  private mode: GameMode;
 
   constructor(
     role: PlayerId,
@@ -135,6 +141,7 @@ export class MatchSession {
     };
     this.handlers = handlers;
     this.options = options;
+    this.mode = options.mode ?? 'base';
   }
 
   get phase(): SessionPhase {
@@ -545,7 +552,7 @@ export class MatchSession {
         this.placementStarted &&
         (this.phaseBeforeDrop === 'placing' || this.phaseBeforeDrop === 'awaiting-opponent')
       ) {
-        this.sendRaw(createLobbyStart());
+        this.sendRaw(createLobbyStart(this.mode));
       }
       this.restorePhaseAfterReconnect();
       if (this.localHash) this.sendRaw(createCommit(this.role, this.localHash));
@@ -609,7 +616,7 @@ export class MatchSession {
   }
 
   private sendHello(): void {
-    this.sendRaw(createHello(this.role, this.identity.name, this.identity.nonce));
+    this.sendRaw(createHello(this.role, this.identity.name, this.identity.nonce, this.mode));
   }
 
   private sendRaw(value: unknown): boolean {
@@ -648,7 +655,7 @@ export class MatchSession {
         this.handleHello(message);
         return;
       case 'lobby-start':
-        this.handleLobbyStart(message.from);
+        this.handleLobbyStart(message.from, message.mode);
         return;
       case 'commit':
         this.handleCommit(message.from, message.mineHash);
@@ -663,6 +670,12 @@ export class MatchSession {
         }
         if (!this.remoteHello) {
           this.warn('Un état de partie est arrivé avant la présentation du pair.');
+          return;
+        }
+        if (message.game && message.game.mode !== this.mode) {
+          this.warn(
+            'Le mode de la partie synchronisée ne correspond pas à celui annoncé par l’hôte.',
+          );
           return;
         }
         this.handlers.onSync?.(message);
@@ -684,7 +697,12 @@ export class MatchSession {
     }
   }
 
-  private handleHello(message: { from: PlayerId; name: string; nonce: string }): void {
+  private handleHello(message: {
+    from: PlayerId;
+    name: string;
+    nonce: string;
+    mode: GameMode;
+  }): void {
     if (message.from === this.role) {
       this.warn('Un message provenant de votre propre rôle a été ignoré.');
       return;
@@ -694,11 +712,14 @@ export class MatchSession {
       return;
     }
 
+    // L’hôte impose le mode ; l’invité suit toujours son choix.
+    if (this.role === 'guest') this.mode = message.mode;
     this.remoteHello = { name: message.name, nonce: message.nonce };
     this.clearTimeout();
     this.handlers.onLobby?.({
       remoteName: message.name || 'Adversaire',
       remoteNonce: message.nonce,
+      mode: this.mode,
     });
     this.resolveJoin();
     if (
@@ -711,7 +732,7 @@ export class MatchSession {
     }
   }
 
-  private handleLobbyStart(from: PlayerId): void {
+  private handleLobbyStart(from: PlayerId, mode: GameMode): void {
     if (this.role === 'host') {
       this.warn('L’hôte ne doit pas recevoir de demande de lancement.');
       return;
@@ -727,6 +748,7 @@ export class MatchSession {
     ) {
       return;
     }
+    this.mode = mode;
     this.placementStarted = true;
     this.setPhase('placing', 'Placez votre mine secrète.');
     this.handlers.onPlacementStart?.();
@@ -763,6 +785,7 @@ export class MatchSession {
       this.remoteHello.nonce,
       this.localHash,
       this.remoteHash,
+      this.mode,
     );
     if (!start) {
       this.fail('Impossible de calculer le premier joueur.');
@@ -813,6 +836,10 @@ export class MatchSession {
       this.warn('L’engagement de mine de l’invité est incohérent.');
       return;
     }
+    if (message.mode !== this.mode) {
+      this.warn('Le mode de la partie ne correspond pas à celui annoncé par l’hôte.');
+      return;
+    }
     const expected = chooseStarter(message.hostNonce, message.guestNonce);
     if (!expected || expected !== message.starter) {
       this.warn('Le premier joueur annoncé est incohérent avec les nonces.');
@@ -830,6 +857,7 @@ export class MatchSession {
     this.setPhase('ready', 'La partie commence.');
     this.handlers.onReady?.({
       starter: start.starter,
+      mode: start.mode,
       remoteName: this.remoteHello.name || 'Adversaire',
       remoteNonce: this.remoteHello.nonce,
       remoteMineHash: this.remoteHash,
@@ -847,7 +875,7 @@ export class MatchSession {
       this.warn('Attendez que votre adversaire soit connecté.');
       return false;
     }
-    if (!this.sendRaw(createLobbyStart())) {
+    if (!this.sendRaw(createLobbyStart(this.mode))) {
       this.warn('Le lancement n’a pas pu être envoyé.');
       return false;
     }

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createGame } from '../engine/endgame';
 import type { PlayerId } from '../engine/types';
 import {
   CodeUnavailableError,
@@ -7,7 +8,13 @@ import {
   type PeerFactory,
   type PeerLike,
 } from './peer';
-import { createCommit, createStart, PROTOCOL_VERSION, type NetworkMessage } from './protocol';
+import {
+  createCommit,
+  createStart,
+  createSync,
+  PROTOCOL_VERSION,
+  type NetworkMessage,
+} from './protocol';
 import { MatchSession, type MatchSessionOptions, type ReadyContext } from './session';
 
 const HOST_NONCE = '0123456789abcdef0123456789abcdef';
@@ -189,7 +196,10 @@ interface Harness {
   guestPlacement: number[];
 }
 
-async function createHarness(extra: MatchSessionOptions = {}): Promise<Harness> {
+async function createHarness(
+  extra: MatchSessionOptions = {},
+  guestExtra: MatchSessionOptions = {},
+): Promise<Harness> {
   const network = new Network();
   const hostReady: ReadyContext[] = [];
   const guestReady: ReadyContext[] = [];
@@ -205,6 +215,7 @@ async function createHarness(extra: MatchSessionOptions = {}): Promise<Harness> 
   const guestPlacement: number[] = [];
 
   const options: MatchSessionOptions = { peerFactory: network.factory, ...extra };
+  const guestOptions: MatchSessionOptions = { ...options, ...guestExtra };
   const host = new MatchSession(
     'host',
     { name: 'Hôte', nonce: HOST_NONCE },
@@ -233,7 +244,7 @@ async function createHarness(extra: MatchSessionOptions = {}): Promise<Harness> 
         guestPlacement.push(Date.now());
       },
     },
-    options,
+    guestOptions,
   );
 
   const code = await host.host();
@@ -294,6 +305,29 @@ describe('session pair-à-pair', () => {
     expect(harness.guest.phase).toBe('lobby');
     expect(harness.hostLobby).toEqual(['Invité']);
     expect(harness.guestLobby).toEqual(['Hôte']);
+  });
+
+  it('impose le mode choisi par l’hôte à l’invité', async () => {
+    const harness = await createHarness({ mode: 'special' }, { mode: 'base' });
+    readyHarness(harness);
+
+    expect(harness.hostReady[0]?.mode).toBe('special');
+    expect(harness.guestReady[0]?.mode).toBe('special');
+    expect(harness.guestReady[0]?.start.mode).toBe('special');
+  });
+
+  it('ignore une synchronisation dont le mode diffère du mode négocié', async () => {
+    const harness = await createHarness({ mode: 'special' });
+    readyHarness(harness);
+    const sync = createSync('host', {
+      round: 1,
+      mineHash: HOST_HASH,
+      starter: 'host',
+      game: createGame('host', 'base'),
+      reveals: [],
+    });
+    harness.network.pairs[0][1].send(JSON.stringify(sync));
+    expect(harness.guestWarnings.some((message) => message.includes('mode'))).toBe(true);
   });
 
   it('lance le placement chez les deux joueurs', async () => {
@@ -380,7 +414,7 @@ describe('session pair-à-pair', () => {
     expect(harness.guest.commitMine(GUEST_HASH)).toBe(true);
     harness.network.pairs[0][1].send(JSON.stringify(createCommit('host', HOST_HASH)));
 
-    const valid = createStart(HOST_NONCE, GUEST_NONCE, HOST_HASH, GUEST_HASH)!;
+    const valid = createStart(HOST_NONCE, GUEST_NONCE, HOST_HASH, GUEST_HASH, 'base')!;
     const wrongStarter = {
       ...valid,
       starter: valid.starter === 'host' ? 'guest' : 'host',
@@ -629,5 +663,5 @@ describe('session pair-à-pair', () => {
 });
 
 function chooseExpectedStarter(): PlayerId {
-  return createStart(HOST_NONCE, GUEST_NONCE, HOST_HASH, GUEST_HASH)!.starter;
+  return createStart(HOST_NONCE, GUEST_NONCE, HOST_HASH, GUEST_HASH, 'base')!.starter;
 }

@@ -48,11 +48,27 @@ export async function verifyReveal({
 
     if (scan.kind === 'wave' && scan.entry) {
       const result = simulateRay(defenderMine, scan.entry);
-      const expectedExit = result.exit?.label ?? 'boucle';
-      const expectedColor = result.color;
       if (scan.answer.kind !== 'wave') {
         replayOk = false;
         problems.push(`Le rayon ${scan.entry.label} a reçu une réponse de type incohérent.`);
+        continue;
+      }
+      if (result.status === 'absorbed') {
+        if (scan.answer.absorbed !== true) {
+          replayOk = false;
+          problems.push(
+            `Rayon ${scan.entry.label} : le signal est absorbé, mais la réponse ne l’indique pas.`,
+          );
+        }
+        continue;
+      }
+      const expectedExit = result.exit?.label ?? 'boucle';
+      const expectedColor = result.color;
+      if (scan.answer.absorbed === true) {
+        replayOk = false;
+        problems.push(
+          `Rayon ${scan.entry.label} : réponse « signal absorbé », attendu « ${expectedExit} / ${expectedColor} ».`,
+        );
         continue;
       }
       if (scan.answer.exit.label !== expectedExit || scan.answer.color !== expectedColor) {
@@ -71,10 +87,13 @@ export async function verifyReveal({
         problems.push(`La case ${cellLabel(scan.cell)} a reçu une réponse de type incohérent.`);
         continue;
       }
-      if (scan.answer.color !== result.color) {
+      if (
+        (scan.answer.special ?? null) !== (result.special ?? null) ||
+        (scan.answer.color ?? null) !== (result.color ?? null)
+      ) {
         replayOk = false;
         problems.push(
-          `Case ${cellLabel(scan.cell)} : réponse « ${scan.answer.color ?? 'rien'} », attendu « ${result.color ?? 'rien'} ».`,
+          `Case ${cellLabel(scan.cell)} : réponse « ${scan.answer.special ?? scan.answer.color ?? 'rien'} », attendu « ${result.special ?? result.color ?? 'rien'} ».`,
         );
       }
     }

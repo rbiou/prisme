@@ -342,4 +342,103 @@ describe('machine à états de fin de partie', () => {
   it('prépare une mine sérialisée de référence', () => {
     expect(deserializeMine(serializeMine(deserializeMine(CANDIDATE))).pieces).toHaveLength(5);
   });
+
+  it('accepte les réponses spéciales en mode spécial', () => {
+    let state = createGame('host', 'special');
+    expect(state.mode).toBe('special');
+
+    state = requestScan(state, {
+      id: 'wave-1',
+      by: 'host',
+      kind: 'wave',
+      entry: entry('1'),
+    }).state;
+    const absorbed = answerScan(state, 'wave-1', { kind: 'wave', absorbed: true });
+    expect(absorbed.ok).toBe(true);
+    expect(absorbed.state.scans[0]?.answer).toEqual({ kind: 'wave', absorbed: true });
+
+    state = requestScan(absorbed.state, {
+      id: 'cell-1',
+      by: 'guest',
+      kind: 'cell',
+      cell: { col: 2, row: 1 },
+    }).state;
+    const special = answerScan(state, 'cell-1', {
+      kind: 'cell',
+      special: 'clear-diamond',
+    });
+    expect(special.ok).toBe(true);
+    expect(special.state.scans[1]?.answer).toEqual({
+      kind: 'cell',
+      special: 'clear-diamond',
+    });
+  });
+
+  it('refuse les réponses spéciales en mode de base', () => {
+    let state = createGame('host');
+    state = requestScan(state, {
+      id: 'wave-1',
+      by: 'host',
+      kind: 'wave',
+      entry: entry('1'),
+    }).state;
+    expect(answerScan(state, 'wave-1', { kind: 'wave', absorbed: true }).ok).toBe(false);
+
+    state = requestScan(state, {
+      id: 'cell-1',
+      by: 'host',
+      kind: 'cell',
+      cell: { col: 2, row: 1 },
+    }).state;
+    expect(answerScan(state, 'cell-1', { kind: 'cell', special: 'black-body' }).ok).toBe(false);
+  });
+
+  it('refuse une confirmation spéciale en mode de base', () => {
+    let state = createGame('host');
+    state = requestScan(state, {
+      id: 'cell-1',
+      by: 'host',
+      kind: 'cell',
+      cell: { col: 2, row: 1 },
+    }).state;
+    state = answerScan(state, 'cell-1', { kind: 'cell', color: 'red' }).state;
+    state = requestScan(state, {
+      id: 'cell-2',
+      by: 'guest',
+      kind: 'cell',
+      cell: { col: 3, row: 2 },
+    }).state;
+    state = answerScan(state, 'cell-2', { kind: 'cell', color: null }).state;
+    state = requestConfirmation(state, {
+      id: 'confirm-1',
+      by: 'host',
+      answerId: 'cell-1',
+    }).state;
+    expect(resolveConfirmation(state, { kind: 'cell', special: 'clear-diamond' }).ok).toBe(false);
+  });
+
+  it('valide la proposition contre le mode de la partie', () => {
+    const specialCandidate: SerializedMine = {
+      version: 1,
+      pieces: [
+        ...CANDIDATE.pieces,
+        { kind: 'clear-diamond', rotation: 0, x: 8, y: 0 },
+        { kind: 'black-body', rotation: 0, x: 8, y: 2 },
+      ],
+    };
+    expect(
+      beginSubmission(createGame('host', 'special'), {
+        id: 'submit-special',
+        by: 'host',
+        candidate: specialCandidate,
+      }).ok,
+    ).toBe(true);
+    expect(
+      beginSubmission(createGame('host', 'base'), {
+        id: 'submit-base',
+        by: 'host',
+        candidate: specialCandidate,
+      }).ok,
+    ).toBe(false);
+  });
 });

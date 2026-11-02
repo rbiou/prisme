@@ -220,6 +220,7 @@ export default function App() {
             role={state.role}
             playerName={state.playerName}
             opponentName={state.opponentName}
+            mode={state.mode}
             locked={state.locked}
             settings={settings}
             error={state.error}
@@ -287,7 +288,7 @@ export default function App() {
       {!gameActive ? (
         <footer className="app-footer">
           <span>Prisme</span>
-          <span>Deux mines. Cinq gemmes. Une seule déduction.</span>
+          <span>{fr.tagline}</span>
           <button type="button" className="text-link" onClick={() => navigate('reglages')}>
             Réglages
           </button>

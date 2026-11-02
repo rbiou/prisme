@@ -1,10 +1,11 @@
 import { BOARD_HEIGHT, BOARD_WIDTH } from './board';
 import { sortMinePieces } from './mine';
-import { PIECE_ORDER, createPiece, pieceBoundingBox } from './pieces';
+import { createPiece, pieceBoundingBox, pieceKindsForMode } from './pieces';
 import { validateMine, validatePartialMine } from './placement';
-import type { Mine, PieceKind, PlacedPiece } from './types';
+import type { GameMode, Mine, PieceKind, PlacedPiece } from './types';
 
 export interface RandomMineOptions {
+  mode?: GameMode;
   enforceWhiteSymmetry?: boolean;
   /** Budget de nœuds pour éviter une recherche sans fin. */
   maxNodes?: number;
@@ -43,16 +44,19 @@ function candidatesFor(kind: PieceKind, random: () => number): PlacedPiece[] {
  */
 export function generateRandomMine(options: RandomMineOptions = {}): Mine | null {
   const random = options.random ?? Math.random;
-  const maxNodes = options.maxNodes ?? 30_000;
-  const pools = PIECE_ORDER.map((kind) => candidatesFor(kind, random));
+  const mode = options.mode ?? 'base';
+  const maxNodes = options.maxNodes ?? (mode === 'special' ? 120_000 : 30_000);
+  const kinds = pieceKindsForMode(mode);
+  const pools = kinds.map((kind) => candidatesFor(kind, random));
   const placed: PlacedPiece[] = [];
   let nodes = 0;
 
   function search(index: number): Mine | null {
     if (nodes > maxNodes) return null;
-    if (index >= PIECE_ORDER.length) {
+    if (index >= kinds.length) {
       const mine = { version: 1 as const, pieces: sortMinePieces(placed) };
       return validateMine(mine, {
+        mode,
         enforceWhiteSymmetry: options.enforceWhiteSymmetry ?? true,
       }).ok
         ? mine

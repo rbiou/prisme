@@ -1,5 +1,5 @@
-import { isGemColor } from './colors';
-import type { Cell, GemColor } from './types';
+import { isNoteColor } from './colors';
+import type { Cell, NoteColor } from './types';
 
 /** Type d’arête notée sur le plateau privé. */
 export type NoteEdgeKind = 'horizontal' | 'vertical' | 'diagonal-down' | 'diagonal-up';
@@ -11,7 +11,7 @@ export interface NoteEdgeMark {
   kind: NoteEdgeKind;
   col: number;
   row: number;
-  color: GemColor;
+  color: NoteColor;
 }
 
 export interface EdgeSegment {
@@ -72,7 +72,7 @@ export function upsertNoteEdge(
   marks: NoteEdgeMark[],
   cell: Cell,
   side: CellEdgeSide,
-  color: GemColor,
+  color: NoteColor,
 ): NoteEdgeMark[] {
   const edge = edgeForCellSide(cell, side);
   const existing = marks.find((mark) => sameEdge(mark, edge));
@@ -111,5 +111,5 @@ export function isNoteEdgeMark(value: unknown): value is NoteEdgeMark {
   if (!bounds) return false;
   if (!isIntegerInRange(candidate.col, bounds.maxCol)) return false;
   if (!isIntegerInRange(candidate.row, bounds.maxRow)) return false;
-  return typeof candidate.color === 'string' && isGemColor(candidate.color);
+  return typeof candidate.color === 'string' && isNoteColor(candidate.color);
 }

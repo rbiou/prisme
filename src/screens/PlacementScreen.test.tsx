@@ -12,6 +12,7 @@ function renderPlacement() {
       role="host"
       playerName="Camille"
       opponentName="Alex"
+      mode="base"
       locked={null}
       settings={DEFAULT_SETTINGS}
       error={null}

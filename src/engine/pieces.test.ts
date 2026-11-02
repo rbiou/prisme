@@ -19,6 +19,8 @@ const EXPECTED = {
   'blue-triangle': { area: 4, width: 4, height: 2, color: 'blue' },
   'white-triangle': { area: 4, width: 4, height: 2, color: 'white' },
   'white-diamond': { area: 2, width: 2, height: 2, color: 'white' },
+  'clear-diamond': { area: 2, width: 2, height: 1, color: null },
+  'black-body': { area: 2, width: 2, height: 1, color: null },
 } as const;
 
 describe('pieces', () => {
@@ -34,6 +36,18 @@ describe('pieces', () => {
         'yellow-triangle',
       ].sort(),
     );
+  });
+
+  it('ajoute les deux gemmes spéciales en rectangle de deux cases', () => {
+    expect(PIECE_DEFINITIONS['clear-diamond'].color).toBeNull();
+    expect(PIECE_DEFINITIONS['black-body'].color).toBeNull();
+    for (const kind of ['clear-diamond', 'black-body'] as const) {
+      const polygon = shapeFor(kind, 0);
+      const box = boundingBox(polygon);
+      expect(box.width).toBeCloseTo(2, 9);
+      expect(box.height).toBeCloseTo(1, 9);
+      expect(polygonArea(polygon)).toBeCloseTo(2, 9);
+    }
   });
 
   it.each(Object.entries(EXPECTED) as Array<[PieceKind, (typeof EXPECTED)[PieceKind]]>)(

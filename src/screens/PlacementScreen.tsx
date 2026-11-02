@@ -3,7 +3,7 @@ import { MineComposer } from '../components/MineComposer';
 import { validateMine } from '../engine/placement';
 import { generateRandomMine } from '../engine/randomMine';
 import { deserializeNote, isSerializedNote, serializeMine } from '../engine/mine';
-import type { Mine, PlayerId } from '../engine/types';
+import type { GameMode, Mine, PlayerId } from '../engine/types';
 import { fr } from '../i18n/fr';
 import type { Settings } from '../state/settings';
 import type { ActionResult } from '../state/useMatch';
@@ -26,6 +26,7 @@ export interface PlacementScreenProps {
   role: PlayerId;
   playerName: string;
   opponentName: string;
+  mode: GameMode;
   locked: LockedMine | null;
   settings: Settings;
   error: string | null;
@@ -39,6 +40,7 @@ export function PlacementScreen({
   role,
   playerName,
   opponentName,
+  mode,
   locked,
   settings,
   error,
@@ -63,9 +65,10 @@ export function PlacementScreen({
   const validation = useMemo(
     () =>
       validateMine(mine, {
+        mode,
         enforceWhiteSymmetry: settings.enforceWhiteSymmetry,
       }),
-    [mine, settings.enforceWhiteSymmetry],
+    [mine, mode, settings.enforceWhiteSymmetry],
   );
 
   const messages = useMemo(() => {
@@ -95,6 +98,7 @@ export function PlacementScreen({
     if (busy || locked) return;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const generated = generateRandomMine({
+        mode,
         enforceWhiteSymmetry: settings.enforceWhiteSymmetry,
       });
       if (generated) {
@@ -161,6 +165,7 @@ export function PlacementScreen({
             <MineComposer
               mine={mine}
               onChange={setMine}
+              mode={mode}
               boardAriaLabel={`Plateau de votre mine secrète, joueur ${playerName || 'sans nom'}`}
             />
           </section>
@@ -173,8 +178,9 @@ export function PlacementScreen({
               </div>
               {validation.ok ? (
                 <p>
-                  Les cinq gemmes respectent la grille, les contacts et la visibilité par les
-                  rayons.
+                  {mode === 'special'
+                    ? 'Les sept gemmes respectent la grille, les contacts et la visibilité par les rayons.'
+                    : 'Les cinq gemmes respectent la grille, les contacts et la visibilité par les rayons.'}
                 </p>
               ) : (
                 <ul className="error-list">
@@ -230,6 +236,7 @@ export function PlacementScreen({
           <MineComposer
             mine={locked.mine}
             onChange={() => undefined}
+            mode={mode}
             disabled
             boardAriaLabel="Votre mine verrouillée"
           />

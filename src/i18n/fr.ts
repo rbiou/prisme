@@ -1,6 +1,6 @@
 export const fr = {
   appName: 'Prisme',
-  tagline: 'Deux mines. Cinq gemmes. Une seule déduction.',
+  tagline: 'Deux mines. Cinq ou sept gemmes. Une seule déduction.',
   common: {
     back: 'Retour',
     cancel: 'Annuler',
@@ -27,7 +27,7 @@ export const fr = {
     kicker: 'Déduction cristalline',
     title: 'Sondez la mine adverse.',
     intro:
-      'Cachez cinq gemmes, puis reconstituiez la mine adverse. Créez un salon ou rejoignez une partie avec un code à six chiffres.',
+      'Cachez cinq ou sept gemmes, puis reconstituiez la mine adverse. Créez un salon ou rejoignez une partie avec un code à six chiffres.',
     create: 'Créer une partie',
     join: 'Rejoindre une partie',
     joinTitle: 'Code à six chiffres',
@@ -39,7 +39,7 @@ export const fr = {
   placement: {
     title: 'Composez votre mine',
     intro:
-      'Placez les cinq gemmes sans chevauchement ni contact bord à bord. Chaque gemme doit être atteignable par au moins un rayon.',
+      'Placez les gemmes sans chevauchement ni contact bord à bord. Chaque gemme doit être atteignable par au moins un rayon.',
     palette: 'Gemmes',
     board: 'Plateau de votre mine',
     selected: 'Pièce sélectionnée',
@@ -84,7 +84,7 @@ export const fr = {
     randomizeHint:
       'Tire une mine valide au hasard. Vous pourrez encore la modifier avant de la verrouiller.',
     lockedNote: 'Une fois verrouillée, votre mine ne peut plus être modifiée pour cette partie.',
-    incomplete: 'Placez les cinq gemmes pour continuer.',
+    incomplete: 'Placez toutes les gemmes du mode choisi pour continuer.',
     secret: 'Privé — cette mine n’est jamais envoyée avant la fin de la partie.',
     rotateShort: 'Rotation',
   },
@@ -194,10 +194,19 @@ export const fr = {
   rules: {
     title: 'Règles de Prisme',
     intro:
-      'Reconstituez la mine de votre adversaire avant qu’il ne reconstitue la vôtre. Les règles ci-dessous résument la boîte de base.',
+      'Reconstituez la mine de votre adversaire avant qu’il ne reconstitue la vôtre. Les règles ci-dessous résument la boîte de base et l’option des deux gemmes spéciales.',
   },
   settings: {
     title: 'Réglages',
+    gameMode: 'Mode de partie',
+    gameModeHint:
+      'Choisissez les gemmes utilisées. En mode spécial, le Diamant et le Corps noir rejoignent les cinq gemmes de base.',
+    gameModeBase: 'Mode de base',
+    gameModeBaseHint: 'Cinq gemmes, sans les deux spéciales.',
+    gameModeSpecial: 'Avec les gemmes spéciales',
+    gameModeSpecialHint: 'Sept gemmes : le Diamant et le Corps noir sont ajoutés.',
+    gameModeGuest:
+      'L’hôte impose le mode à la partie. L’invité suit automatiquement le mode annoncé dans le salon.',
     whiteSymmetry: 'Interdire la symétrie parfaite des gemmes blanches',
     whiteSymmetryHint:
       'Règle de clarification 2025, activée par défaut. Désactivez-la pour suivre strictement le livret fourni.',

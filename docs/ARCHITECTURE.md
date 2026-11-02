@@ -121,14 +121,21 @@ entre les deux navigateurs.
 
 ```ts
 type GemColor = 'red' | 'yellow' | 'blue' | 'white';
-type Rotation = 0 | 1 | 2 | 3;
+type SpecialPieceKind = 'clear-diamond' | 'black-body';
 type PieceKind =
-  'red-parallelogram' | 'yellow-triangle' | 'blue-triangle' | 'white-triangle' | 'white-diamond';
+  | 'red-parallelogram'
+  | 'yellow-triangle'
+  | 'blue-triangle'
+  | 'white-triangle'
+  | 'white-diamond'
+  | SpecialPieceKind;
+type GameMode = 'base' | 'special';
+type Rotation = 0 | 1 | 2 | 3;
 
 interface PlacedPiece {
-  id: PieceKind; // une seule pièce de chaque type dans la base
+  id: PieceKind; // une seule pièce de chaque type dans la mine
   kind: PieceKind;
-  color: GemColor;
+  color: GemColor | null; // null pour le Diamant et le Corps noir
   rotation: Rotation;
   x: number;
   y: number;
@@ -140,9 +147,10 @@ interface Mine {
 }
 ```
 
-L'ancre `(x, y)` est le coin supérieur gauche de la boîte englobante de la pièce
-après rotation. Les polygones canoniques et leurs quatre rotations sont définis
-dans `pieces.ts`.
+Le mode `base` utilise les cinq pièces historiques ; le mode `special` ajoute
+le Diamant et le Corps noir, deux rectangles 2 × 1. L'ancre `(x, y)` est le coin
+supérieur gauche de la boîte englobante de la pièce après rotation. Les polygones
+canoniques et leurs quatre rotations sont définis dans `pieces.ts`.
 
 ### 4.3 Rayons et couleurs
 
@@ -167,11 +175,11 @@ type RayColor =
 
 interface RayHit {
   pieceId: PieceKind;
-  color: GemColor;
+  color: GemColor | null;
   point: Point;
 }
 interface RayResult {
-  status: 'exit' | 'loop';
+  status: 'exit' | 'loop' | 'absorbed';
   entry: Entry;
   exit?: Entry;
   color: RayColor;
@@ -183,13 +191,14 @@ interface RayResult {
 
 `simulateRay(mine, entry)` est déterministe et pur. Il renvoie `status: 'loop'`
 si un état `(position, direction)` se répète ou si le nombre de réflexions
-dépasse le plafond.
+dépasse le plafond. Le Diamant réfléchit sans ajouter de couleur ; le Corps noir
+renvoie `status: 'absorbed'` sans point de sortie.
 
 ### 4.4 Validation
 
-`validateMine(mine, options)` vérifie :
+`validateMine(mine, options)` vérifie, selon `options.mode` :
 
-- composition exacte des cinq pièces ;
+- composition exacte des cinq pièces de base ou des sept pièces spéciales ;
 - rotation valide et sommets entiers ;
 - pièce contenue dans le plateau ;
 - pas de chevauchement ;
@@ -206,9 +215,10 @@ surligne les pièces concernées.
 
 `scanCell(mine, cell)` calcule l'aire d'intersection de chaque pièce avec la
 case. La réponse est la pièce qui couvre la plus grande aire. En cas d'égalité,
-le centre de la case est testé ; en dernier recours, un ordre fixe
-(rouge, jaune, bleu, blanc) tranche. Le résultat inclut les aires pour les tests
-et l'interface de débogage.
+le centre de la case est testé ; en dernier recours, un ordre fixe tranche. Le
+résultat inclut les aires pour les tests et l'interface de débogage. Une pièce
+spéciale est renvoyée dans `special` ; le Corps noir produit la réponse
+« Le signal a été absorbé » côté interface.
 
 ### 4.6 Fin de partie
 
@@ -216,7 +226,7 @@ La machine à états est indépendante des mines :
 
 ```ts
 type PlayerId = 'host' | 'guest';
-type Phase = 'playing' | 'awaiting-answer' | 'final-turn' | 'ended';
+type Phase = 'playing' | 'awaiting-answer' | 'awaiting-verification' | 'final-turn' | 'ended';
 type EndReason =
   | 'non-starter-correct'
   | 'starter-correct-opponent-wrong'
@@ -225,6 +235,7 @@ type EndReason =
   | 'forfeit';
 
 interface GameState {
+  mode: GameMode;
   phase: Phase;
   starter: PlayerId;
   turn: PlayerId;
@@ -235,6 +246,11 @@ interface GameState {
   submissions: SubmissionRecord[];
 }
 ```
+
+`createGame(starter, mode)` fixe le mode dès l'initialisation. Toutes les
+validations de réponses et de propositions sont mode-aware : une réponse
+absorbée ou spéciale est refusée en mode de base, et une proposition doit
+contenir exactement les pièces du mode.
 
 `resolveSubmission(state, player, correct)` est pure et couvre tous les cas.
 Le défenseur est seul à vérifier la proposition ; le résultat est ensuite
@@ -265,7 +281,8 @@ arête, ce qui évite les ambiguïtés.
 
 `matchReducer` regroupe l'état public de la session et celui de la partie :
 
-- rôle, nom, code de salon, phase de session, adversaire, nonce et engagement ;
+- rôle, nom, code de salon, mode de partie, phase de session, adversaire, nonce
+  et engagement ;
 - `GameState` : phase, tour, premier joueur, dernier tour ;
 - journal des scans et confirmations ;
 - propositions et résultat ;
@@ -284,12 +301,15 @@ du canal de données sont la source des actions distantes.
   partagée par deux cases ne soit enregistrée qu'une fois. Les notes finales
   (pièces, croix, arêtes et ronds) accompagnent le message `reveal` à la fin de
   la partie et servent à expliquer le raisonnement.
-- `settings` : options de règles et d'accessibilité.
+- `settings` : mode de partie, options de règles et d'accessibilité. Le mode est
+  choisi par l'hôte et annoncé dans le salon ; l'invité l'adopte.
 - `session` : rôle, code de salon, phase (salon, placement, attente, prête,
   reprise) et état de connexion.
-- `resume` : dans `localStorage`, code, rôle, nonce, mine verrouillée (mine,
-  sel, engagement) et dernier état public. Utilisé pour reprendre après une
-  fermeture de l'application ; effacé à la fin de la partie ou au départ.
+- `resume` : dans `localStorage`, code, rôle, nonce, mode de partie, mine
+  verrouillée (mine, sel, engagement) et dernier état public. Utilisé pour
+  reprendre après une fermeture de l'application ; effacé à la fin de la partie
+  ou au départ. Une sauvegarde antérieure au mode spécial est relue en mode de
+  base.
 
 Les notes et la mine ne sont jamais incluses dans les messages publics avant la
 révélation finale.
@@ -344,20 +364,21 @@ navigation suit la session : accueil → salon → placement → partie.
 ### 7.3 Protocole
 
 Voir `docs/PROTOCOL.md`. Les messages sont des objets JSON avec un champ `type`
-et `protocol: 3`. Ils sont validés par des guards avant application. Les
+et `protocol: 4`. Ils sont validés par des guards avant application. Les
 messages inconnus ou mal formés sont ignorés. Le message `sync` transporte
-l'état public et les révélations déjà reçues, jamais la mine secrète.
+l'état public, son mode et les révélations déjà reçues, jamais la mine secrète.
 
 ### 7.4 Démarrage
 
 1. L'hôte réserve le code, ouvre le salon et attend.
-2. L'invité rejoint avec le code. Les deux échangent `hello`.
+2. L'invité rejoint avec le code. Les deux échangent `hello`, qui annonce le
+   mode de l'hôte ; l'invité adopte ce mode.
 3. L'hôte envoie `lobby-start` ; chaque joueur place sa mine.
 4. Chaque joueur verrouille sa mine et calcule `SHA-256(canonicalMine + salt)`,
    puis envoie `commit`.
 5. Quand l'hôte a les deux engagements, il envoie `start` avec les deux nonces,
-   les deux hashes et le premier joueur calculé par XOR. Les deux clients
-   initialisent le même état.
+   les deux hashes, le mode et le premier joueur calculé par XOR. Les deux
+   clients initialisent le même état.
 6. Le premier joueur agit.
 
 ## 8. Intégrité
@@ -386,11 +407,13 @@ l'état public et les révélations déjà reçues, jamais la mine secrète.
 
 ## 10. Tests
 
-- **Moteur** : pièces, rotations, aires, mélange, rayons, boucles, validation,
-  scan de case, fin de partie, sérialisation.
-- **Réseau** : code de salon, validation des messages (dont `sync` et les notes
-  finales), calcul du premier joueur, machine de session (hôte/invité) avec un
-  faux pair PeerJS, engagement, démarrage, coupure et reprise.
+- **Moteur** : pièces (dont les deux spéciales), rotations, aires, mélange,
+  rayons, absorption, boucles, validation mode-aware, scan de case, fin de
+  partie, sérialisation.
+- **Réseau** : code de salon, validation des messages (dont `sync`, les notes
+  finales et les réponses spéciales), calcul du premier joueur, propagation du
+  mode hôte → invité, machine de session avec un faux pair PeerJS, engagement,
+  démarrage, coupure et reprise.
 - **Notes et génération** : arêtes canoniques, ronds de couleur, placement
   aléatoire valide, sérialisation des notes incomplètes.
 - **Interface** : smoke tests des écrans, placement d'une pièce, affichage des
@@ -431,3 +454,4 @@ l'état public et les révélations déjà reçues, jamais la mine secrète.
 | SVG                      | Précision géométrique, rayons, accessibilité, poids faible.       |
 | Pas de router externe    | Hash routing simple, compatible GitHub Pages.                     |
 | Règle 2025 optionnelle   | Fidélité au livret fourni + clarté compétitive.                   |
+| Mode spécial optionnel   | Deux gemmes supplémentaires, sans alourdir le mode de référence.  |

@@ -4,18 +4,21 @@ import { isGemColor, isRayColor } from '../engine/colors';
 import { isGameState } from '../engine/endgame';
 import { isSerializedMine, isSerializedNote } from '../engine/mine';
 import { isNoteEdgeMark, type NoteEdgeMark } from '../engine/noteEdges';
+import { isGameMode, isSpecialPieceKind } from '../engine/pieces';
 import type {
   Cell,
+  GameMode,
   GemColor,
   GameState,
   PlayerId,
   RayColor,
   SerializedMine,
   SerializedNote,
+  SpecialPieceKind,
 } from '../engine/types';
 import { isHex, randomHex } from './integrity';
 
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 export const MAX_NAME_LENGTH = 40;
 export const MAX_ID_LENGTH = 64;
 
@@ -28,6 +31,8 @@ export interface HelloMessage extends MessageBase {
   from: PlayerId;
   name: string;
   nonce: string;
+  /** Mode annoncé par l’hôte ; la valeur de l’invité n’est jamais décisive. */
+  mode: GameMode;
 }
 
 export interface CommitMessage extends MessageBase {
@@ -41,6 +46,7 @@ export interface LobbyStartMessage extends MessageBase {
   type: 'lobby-start';
   id: string;
   from: 'host';
+  mode: GameMode;
 }
 
 export interface StartMessage extends MessageBase {
@@ -51,6 +57,7 @@ export interface StartMessage extends MessageBase {
   guestNonce: string;
   hostHash: string;
   guestHash: string;
+  mode: GameMode;
 }
 
 export interface SyncReveal {
@@ -91,25 +98,39 @@ export interface ScanCellMessage extends MessageBase {
 
 export type ScanMessage = ScanWaveMessage | ScanCellMessage;
 
-export interface AnswerWaveMessage extends MessageBase {
+interface AnswerBase extends MessageBase {
   type: 'answer';
   id: string;
   from: PlayerId;
   scanId: string;
+}
+
+export interface AnswerWaveAbsorbedMessage extends AnswerBase {
   kind: 'wave';
+  absorbed: true;
+}
+
+export interface AnswerWaveExitMessage extends AnswerBase {
+  kind: 'wave';
+  absorbed?: false;
   exit: string;
   color: RayColor;
 }
 
-export interface AnswerCellMessage extends MessageBase {
-  type: 'answer';
-  id: string;
-  from: PlayerId;
-  scanId: string;
+export interface AnswerCellGemMessage extends AnswerBase {
   kind: 'cell';
+  special?: null;
   color: GemColor | null;
 }
 
+export interface AnswerCellSpecialMessage extends AnswerBase {
+  kind: 'cell';
+  special: SpecialPieceKind;
+  color?: null;
+}
+
+export type AnswerWaveMessage = AnswerWaveAbsorbedMessage | AnswerWaveExitMessage;
+export type AnswerCellMessage = AnswerCellGemMessage | AnswerCellSpecialMessage;
 export type AnswerMessage = AnswerWaveMessage | AnswerCellMessage;
 
 export interface CancelScanMessage extends MessageBase {
@@ -126,25 +147,41 @@ export interface ConfirmRequestMessage extends MessageBase {
   answerId: string;
 }
 
-export interface ConfirmResultWaveMessage extends MessageBase {
+interface ConfirmResultBase extends MessageBase {
   type: 'confirm-result';
   id: string;
   from: PlayerId;
   answerId: string;
+}
+
+export interface ConfirmResultWaveAbsorbedMessage extends ConfirmResultBase {
   kind: 'wave';
+  absorbed: true;
+}
+
+export interface ConfirmResultWaveExitMessage extends ConfirmResultBase {
+  kind: 'wave';
+  absorbed?: false;
   exit: string;
   color: RayColor;
 }
 
-export interface ConfirmResultCellMessage extends MessageBase {
-  type: 'confirm-result';
-  id: string;
-  from: PlayerId;
-  answerId: string;
+export interface ConfirmResultCellGemMessage extends ConfirmResultBase {
   kind: 'cell';
+  special?: null;
   color: GemColor | null;
 }
 
+export interface ConfirmResultCellSpecialMessage extends ConfirmResultBase {
+  kind: 'cell';
+  special: SpecialPieceKind;
+  color?: null;
+}
+
+export type ConfirmResultWaveMessage =
+  ConfirmResultWaveAbsorbedMessage | ConfirmResultWaveExitMessage;
+export type ConfirmResultCellMessage =
+  ConfirmResultCellGemMessage | ConfirmResultCellSpecialMessage;
 export type ConfirmResultMessage = ConfirmResultWaveMessage | ConfirmResultCellMessage;
 
 export interface SubmitMessage extends MessageBase {
@@ -230,9 +267,31 @@ function isCellValue(value: unknown): value is Cell {
   );
 }
 
-function isAnswerColor(kind: 'wave' | 'cell', value: unknown): boolean {
-  if (kind === 'wave') return typeof value === 'string' && isRayColor(value);
-  return value === null || (typeof value === 'string' && isGemColor(value));
+function isWaveAnswerFields(value: Record<string, unknown>): boolean {
+  if (value.absorbed === true) {
+    return value.exit === undefined && value.color === undefined;
+  }
+  return (
+    (value.absorbed === undefined || value.absorbed === false) &&
+    typeof value.exit === 'string' &&
+    isValidEntryLabel(value.exit) &&
+    typeof value.color === 'string' &&
+    isRayColor(value.color)
+  );
+}
+
+function isCellAnswerFields(value: Record<string, unknown>): boolean {
+  if (value.special !== undefined && value.special !== null) {
+    return (
+      typeof value.special === 'string' &&
+      isSpecialPieceKind(value.special) &&
+      (value.color === undefined || value.color === null)
+    );
+  }
+  return (
+    (value.special === undefined || value.special === null) &&
+    (value.color === null || (typeof value.color === 'string' && isGemColor(value.color)))
+  );
 }
 
 export function isRevealMarks(value: unknown): value is RevealMarks {
@@ -263,7 +322,8 @@ export function isNetworkMessage(value: unknown): value is NetworkMessage {
         typeof value.name === 'string' &&
         value.name.length <= MAX_NAME_LENGTH &&
         typeof value.nonce === 'string' &&
-        isHex(value.nonce, 32)
+        isHex(value.nonce, 32) &&
+        isGameMode(value.mode)
       );
     case 'commit':
       return (
@@ -273,7 +333,7 @@ export function isNetworkMessage(value: unknown): value is NetworkMessage {
         isHex(value.mineHash, 64)
       );
     case 'lobby-start':
-      return isMessageId(value.id) && value.from === 'host';
+      return isMessageId(value.id) && value.from === 'host' && isGameMode(value.mode);
     case 'start':
       return (
         value.from === 'host' &&
@@ -285,9 +345,10 @@ export function isNetworkMessage(value: unknown): value is NetworkMessage {
         typeof value.hostHash === 'string' &&
         isHex(value.hostHash, 64) &&
         typeof value.guestHash === 'string' &&
-        isHex(value.guestHash, 64)
+        isHex(value.guestHash, 64) &&
+        isGameMode(value.mode)
       );
-    case 'sync':
+    case 'sync': {
       if (!isMessageId(value.id) || !isPlayerId(value.from)) return false;
       if (
         typeof value.round !== 'number' ||
@@ -306,6 +367,7 @@ export function isNetworkMessage(value: unknown): value is NetworkMessage {
       if (value.starter !== null && !isPlayerId(value.starter)) return false;
       if (value.game !== null && value.starter === null) return false;
       if (value.game !== null && !isGameState(value.game)) return false;
+      const mineMode: GameMode | 'any' = value.game !== null ? value.game.mode : 'any';
       return (
         Array.isArray(value.reveals) &&
         value.reveals.length <= 2 &&
@@ -313,7 +375,7 @@ export function isNetworkMessage(value: unknown): value is NetworkMessage {
           (reveal) =>
             isRecord(reveal) &&
             isPlayerId(reveal.from) &&
-            isSerializedMine(reveal.mine) &&
+            isSerializedMine(reveal.mine, mineMode) &&
             typeof reveal.salt === 'string' &&
             isHex(reveal.salt, 32) &&
             (reveal.notes === undefined ||
@@ -322,6 +384,7 @@ export function isNetworkMessage(value: unknown): value is NetworkMessage {
             (reveal.marks === undefined || reveal.marks === null || isRevealMarks(reveal.marks)),
         )
       );
+    }
     case 'scan':
       if (!isMessageId(value.id) || !isPlayerId(value.from)) return false;
       if (value.kind === 'wave') {
@@ -333,17 +396,8 @@ export function isNetworkMessage(value: unknown): value is NetworkMessage {
       if (!isMessageId(value.id) || !isMessageId(value.scanId) || !isPlayerId(value.from)) {
         return false;
       }
-      if (value.kind === 'wave') {
-        return (
-          typeof value.exit === 'string' &&
-          isValidEntryLabel(value.exit) &&
-          typeof value.color === 'string' &&
-          isRayColor(value.color)
-        );
-      }
-      if (value.kind === 'cell') {
-        return isAnswerColor('cell', value.color);
-      }
+      if (value.kind === 'wave') return isWaveAnswerFields(value);
+      if (value.kind === 'cell') return isCellAnswerFields(value);
       return false;
     case 'cancel-scan':
       return isMessageId(value.id) && isMessageId(value.scanId) && isPlayerId(value.from);
@@ -353,18 +407,13 @@ export function isNetworkMessage(value: unknown): value is NetworkMessage {
       if (!isMessageId(value.id) || !isMessageId(value.answerId) || !isPlayerId(value.from)) {
         return false;
       }
-      if (value.kind === 'wave') {
-        return (
-          typeof value.exit === 'string' &&
-          isValidEntryLabel(value.exit) &&
-          typeof value.color === 'string' &&
-          isRayColor(value.color)
-        );
-      }
-      if (value.kind === 'cell') return isAnswerColor('cell', value.color);
+      if (value.kind === 'wave') return isWaveAnswerFields(value);
+      if (value.kind === 'cell') return isCellAnswerFields(value);
       return false;
     case 'submit':
-      return isMessageId(value.id) && isPlayerId(value.from) && isSerializedMine(value.candidate);
+      return (
+        isMessageId(value.id) && isPlayerId(value.from) && isSerializedMine(value.candidate, 'any')
+      );
     case 'submit-result':
       return (
         isMessageId(value.id) &&
@@ -376,7 +425,7 @@ export function isNetworkMessage(value: unknown): value is NetworkMessage {
       return (
         isMessageId(value.id) &&
         isPlayerId(value.from) &&
-        isSerializedMine(value.mine) &&
+        isSerializedMine(value.mine, 'any') &&
         typeof value.salt === 'string' &&
         isHex(value.salt, 32) &&
         (value.notes === undefined || value.notes === null || isSerializedNote(value.notes)) &&
@@ -410,16 +459,21 @@ export function chooseStarter(hostNonce: string, guestNonce: string): PlayerId |
   return mixed % 2n === 0n ? 'host' : 'guest';
 }
 
-export function createHello(from: PlayerId, name: string, nonce: string): HelloMessage {
-  return { protocol: PROTOCOL_VERSION, type: 'hello', from, name, nonce };
+export function createHello(
+  from: PlayerId,
+  name: string,
+  nonce: string,
+  mode: GameMode,
+): HelloMessage {
+  return { protocol: PROTOCOL_VERSION, type: 'hello', from, name, nonce, mode };
 }
 
 export function createCommit(from: PlayerId, mineHash: string, id = newMessageId()): CommitMessage {
   return { protocol: PROTOCOL_VERSION, type: 'commit', id, from, mineHash };
 }
 
-export function createLobbyStart(id = newMessageId()): LobbyStartMessage {
-  return { protocol: PROTOCOL_VERSION, type: 'lobby-start', id, from: 'host' };
+export function createLobbyStart(mode: GameMode, id = newMessageId()): LobbyStartMessage {
+  return { protocol: PROTOCOL_VERSION, type: 'lobby-start', id, from: 'host', mode };
 }
 
 export function createSync(
@@ -434,6 +488,7 @@ export function createStart(
   guestNonce: string,
   hostHash: string,
   guestHash: string,
+  mode: GameMode,
 ): StartMessage | null {
   const starter = chooseStarter(hostNonce, guestNonce);
   if (!starter || !isHex(hostHash, 64) || !isHex(guestHash, 64)) return null;
@@ -446,5 +501,6 @@ export function createStart(
     guestNonce,
     hostHash,
     guestHash,
+    mode,
   };
 }

@@ -1,5 +1,6 @@
 import { cellLabel, entryForLabel, sideLabel } from '../engine/board';
-import { GEM_COLOR_LABELS, RAY_COLOR_LABELS } from '../engine/colors';
+import { GEM_COLOR_LABELS, RAY_COLOR_LABELS, SPECIAL_COLOR_LABELS } from '../engine/colors';
+import { isSerializedMine } from '../engine/mine';
 import {
   answerScan,
   beginSubmission,
@@ -14,6 +15,7 @@ import {
 } from '../engine/endgame';
 import type {
   Cell,
+  GameMode,
   GameState,
   PlayerId,
   ScanRecord,
@@ -50,6 +52,7 @@ export interface MatchState {
   role: PlayerId | null;
   playerName: string;
   roomCode: string | null;
+  mode: GameMode;
   sessionPhase: SessionPhase;
   sessionDetail: string | null;
   transportStatus: PeerStatus;
@@ -70,6 +73,7 @@ export const initialMatchState: MatchState = {
   role: null,
   playerName: '',
   roomCode: null,
+  mode: 'base',
   sessionPhase: 'idle',
   sessionDetail: null,
   transportStatus: 'idle',
@@ -91,6 +95,7 @@ export interface ResumeData {
   role: PlayerId;
   playerName: string;
   roomCode: string;
+  mode: GameMode;
   sessionPhase: SessionPhase;
   locked: LockedMine | null;
   starter: PlayerId | null;
@@ -103,7 +108,7 @@ export interface ResumeData {
 }
 
 export type MatchAction =
-  | { type: 'begin'; role: PlayerId; playerName: string }
+  | { type: 'begin'; role: PlayerId; playerName: string; mode: GameMode }
   | { type: 'hydrate'; data: ResumeData }
   | {
       type: 'adopt';
@@ -173,8 +178,11 @@ function describeQuestion(question: {
 
 function describeAnswer(answer: ScanAnswer): string {
   if (answer.kind === 'wave') {
-    return `sortie ${answer.exit.label} · ${RAY_COLOR_LABELS[answer.color]}`;
+    return answer.absorbed === true
+      ? 'le signal a été absorbé'
+      : `sortie ${answer.exit.label} · ${RAY_COLOR_LABELS[answer.color]}`;
   }
+  if (answer.special) return SPECIAL_COLOR_LABELS[answer.special];
   return answer.color ? GEM_COLOR_LABELS[answer.color] : 'aucune gemme';
 }
 
@@ -217,16 +225,20 @@ function handleMessage(state: MatchState, message: NetworkMessage, now: number):
     case 'answer': {
       const answer: ScanAnswer =
         message.kind === 'wave'
-          ? {
-              kind: 'wave',
-              exit: entryForLabel(message.exit) ?? {
-                side: 'top',
-                index: 0,
-                label: message.exit,
-              },
-              color: message.color,
-            }
-          : { kind: 'cell', color: message.color };
+          ? message.absorbed === true
+            ? { kind: 'wave', absorbed: true }
+            : {
+                kind: 'wave',
+                exit: entryForLabel(message.exit) ?? {
+                  side: 'top',
+                  index: 0,
+                  label: message.exit,
+                },
+                color: message.color,
+              }
+          : message.special
+            ? { kind: 'cell', special: message.special }
+            : { kind: 'cell', color: message.color ?? null };
       const pending = state.game.pendingScan;
       const answered = applyGameResult(state, answerScan(state.game, message.scanId, answer, now));
       if (!answered.game || answered.warning) return answered;
@@ -264,16 +276,20 @@ function handleMessage(state: MatchState, message: NetworkMessage, now: number):
       }
       const answer: ScanAnswer =
         message.kind === 'wave'
-          ? {
-              kind: 'wave',
-              exit: entryForLabel(message.exit) ?? {
-                side: 'top',
-                index: 0,
-                label: message.exit,
-              },
-              color: message.color,
-            }
-          : { kind: 'cell', color: message.color };
+          ? message.absorbed === true
+            ? { kind: 'wave', absorbed: true }
+            : {
+                kind: 'wave',
+                exit: entryForLabel(message.exit) ?? {
+                  side: 'top',
+                  index: 0,
+                  label: message.exit,
+                },
+                color: message.color,
+              }
+          : message.special
+            ? { kind: 'cell', special: message.special }
+            : { kind: 'cell', color: message.color ?? null };
       const original = findOriginal(state, message.answerId);
       const resolved = applyGameResult(state, resolveConfirmation(state.game, answer, now));
       if (!resolved.game || resolved.warning || !original) return resolved;
@@ -314,6 +330,12 @@ function handleMessage(state: MatchState, message: NetworkMessage, now: number):
         return {
           ...state,
           warning: 'Une révélation a été ignorée : la partie n’est pas terminée.',
+        };
+      }
+      if (!isSerializedMine(message.mine, state.mode)) {
+        return {
+          ...state,
+          warning: 'Une révélation a été ignorée : la mine ne correspond pas au mode de la partie.',
         };
       }
       const existing = state.reveals[message.from];
@@ -375,6 +397,7 @@ export function matchReducer(state: MatchState, action: MatchAction): MatchState
         ...initialMatchState,
         role: action.role,
         playerName: action.playerName,
+        mode: action.mode,
       };
     case 'hydrate':
       return {
@@ -382,6 +405,7 @@ export function matchReducer(state: MatchState, action: MatchAction): MatchState
         role: action.data.role,
         playerName: action.data.playerName,
         roomCode: action.data.roomCode,
+        mode: action.data.mode,
         sessionPhase: 'reconnecting',
         sessionDetail: 'Reprise de la partie…',
         transportStatus: 'opening',
@@ -398,6 +422,7 @@ export function matchReducer(state: MatchState, action: MatchAction): MatchState
       return {
         ...state,
         game: action.game ?? state.game,
+        mode: action.game?.mode ?? state.mode,
         starter: action.starter ?? state.starter,
         opponentHash: action.opponentHash ?? state.opponentHash,
         reveals: { ...state.reveals, ...action.reveals },
@@ -447,6 +472,7 @@ export function matchReducer(state: MatchState, action: MatchAction): MatchState
     case 'lobby':
       return {
         ...state,
+        mode: action.context.mode,
         opponentName: action.context.remoteName || 'Adversaire',
         opponentNonce: action.context.remoteNonce,
         warning: null,
@@ -457,10 +483,11 @@ export function matchReducer(state: MatchState, action: MatchAction): MatchState
       return {
         ...state,
         starter: action.context.starter,
+        mode: action.context.mode,
         opponentName: action.context.remoteName || 'Adversaire',
         opponentNonce: action.context.remoteNonce,
         opponentHash: action.context.remoteMineHash,
-        game: createGame(action.context.starter),
+        game: createGame(action.context.starter, action.context.mode),
         sessionPhase: 'ready',
         sessionDetail: null,
         readyAt: action.now,

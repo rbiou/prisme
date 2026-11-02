@@ -1,35 +1,36 @@
 import { entryForLabel, isCell } from './board';
 import { isGemColor, isRayColor } from './colors';
 import { isSerializedMine } from './mine';
+import { isGameMode, isSpecialPieceKind } from './pieces';
 import type {
   Cell,
   EndReason,
   Entry,
   GameActionResult,
+  GameMode,
   GamePhase,
   GameState,
   PendingScan,
   PendingSubmission,
   PlayerId,
-  RayColor,
+  ScanAnswer,
   ScanRecord,
   SerializedMine,
 } from './types';
+
+export type { ScanAnswer } from './types';
 
 export type ScanRequest =
   | { id: string; by: PlayerId; kind: 'wave'; entry: Entry }
   | { id: string; by: PlayerId; kind: 'cell'; cell: { col: number; row: number } };
 
-export type ScanAnswer =
-  | { kind: 'wave'; exit: Entry; color: RayColor }
-  | { kind: 'cell'; color: 'red' | 'yellow' | 'blue' | 'white' | null };
-
 export function otherPlayer(player: PlayerId): PlayerId {
   return player === 'host' ? 'guest' : 'host';
 }
 
-export function createGame(starter: PlayerId): GameState {
+export function createGame(starter: PlayerId, mode: GameMode = 'base'): GameState {
   return {
+    mode,
     phase: 'playing',
     starter,
     turn: starter,
@@ -40,6 +41,11 @@ export function createGame(starter: PlayerId): GameState {
 
 function fail(state: GameState, error: string): GameActionResult {
   return { ok: false, state, error };
+}
+
+function isSpecialAnswer(answer: ScanAnswer): boolean {
+  if (answer.kind === 'wave') return answer.absorbed === true;
+  return answer.special !== undefined && answer.special !== null;
 }
 
 function succeed(state: GameState): GameActionResult {
@@ -89,6 +95,12 @@ export function answerScan(
   }
   if (state.pendingScan.kind !== answer.kind) {
     return fail(state, 'Le type de réponse ne correspond pas au type de scan.');
+  }
+  if (state.mode !== 'special' && isSpecialAnswer(answer)) {
+    return fail(
+      state,
+      'Cette réponse spéciale n’est possible qu’en mode avec les gemmes spéciales.',
+    );
   }
 
   const pending = state.pendingScan;
@@ -154,6 +166,12 @@ export function resolveConfirmation(
   if (original.kind !== answer.kind) {
     return fail(state, 'Le type de la confirmation ne correspond pas à la réponse d’origine.');
   }
+  if (state.mode !== 'special' && isSpecialAnswer(answer)) {
+    return fail(
+      state,
+      'Cette réponse spéciale n’est possible qu’en mode avec les gemmes spéciales.',
+    );
+  }
 
   const record: ScanRecord = {
     id: pending.id,
@@ -185,6 +203,9 @@ export function beginSubmission(
   }
   if (state.pendingScan || state.pendingConfirmation) {
     return fail(state, 'Une action est déjà en attente.');
+  }
+  if (!isSerializedMine(submission.candidate, state.mode)) {
+    return fail(state, 'La proposition ne contient pas les gemmes attendues pour ce mode.');
   }
 
   const pending: PendingSubmission = {
@@ -353,13 +374,32 @@ function isCellValue(value: unknown): value is Cell {
   );
 }
 
-function isScanAnswerValue(value: unknown): boolean {
+function isScanAnswerValue(value: unknown, mode: GameMode): boolean {
   if (!isRecord(value)) return false;
   if (value.kind === 'wave') {
-    return isEntryValue(value.exit) && typeof value.color === 'string' && isRayColor(value.color);
+    if (value.absorbed === true) {
+      return mode === 'special' && value.exit === undefined && value.color === undefined;
+    }
+    return (
+      value.absorbed === undefined &&
+      isEntryValue(value.exit) &&
+      typeof value.color === 'string' &&
+      isRayColor(value.color)
+    );
   }
   if (value.kind === 'cell') {
-    return value.color === null || (typeof value.color === 'string' && isGemColor(value.color));
+    if (value.special !== undefined && value.special !== null) {
+      return (
+        mode === 'special' &&
+        typeof value.special === 'string' &&
+        isSpecialPieceKind(value.special) &&
+        (value.color === undefined || value.color === null)
+      );
+    }
+    return (
+      (value.special === undefined || value.special === null) &&
+      (value.color === null || (typeof value.color === 'string' && isGemColor(value.color)))
+    );
   }
   return false;
 }
@@ -372,16 +412,16 @@ function isPendingScanValue(value: unknown): value is PendingScan {
   return false;
 }
 
-function isPendingSubmissionValue(value: unknown): value is PendingSubmission {
+function isPendingSubmissionValue(value: unknown, mode: GameMode): value is PendingSubmission {
   return (
     isRecord(value) &&
     typeof value.id === 'string' &&
     isPlayerIdValue(value.by) &&
-    isSerializedMine(value.candidate)
+    isSerializedMine(value.candidate, mode)
   );
 }
 
-function isScanRecordValue(value: unknown): value is ScanRecord {
+function isScanRecordValue(value: unknown, mode: GameMode): value is ScanRecord {
   if (!isRecord(value)) return false;
   if (typeof value.id !== 'string' || !isPlayerIdValue(value.by)) return false;
   if (value.kind !== 'wave' && value.kind !== 'cell') return false;
@@ -389,15 +429,16 @@ function isScanRecordValue(value: unknown): value is ScanRecord {
   if (value.cell !== undefined && !isCellValue(value.cell)) return false;
   if (value.confirmationOf !== undefined && typeof value.confirmationOf !== 'string') return false;
   if (typeof value.createdAt !== 'number') return false;
-  return isScanAnswerValue(value.answer);
+  if (!isScanAnswerValue(value.answer, mode)) return false;
+  return isRecord(value.answer) && value.answer.kind === value.kind;
 }
 
-function isSubmissionRecordValue(value: unknown): boolean {
+function isSubmissionRecordValue(value: unknown, mode: GameMode): boolean {
   return (
     isRecord(value) &&
     typeof value.id === 'string' &&
     isPlayerIdValue(value.by) &&
-    isSerializedMine(value.candidate) &&
+    isSerializedMine(value.candidate, mode) &&
     typeof value.correct === 'boolean' &&
     typeof value.createdAt === 'number'
   );
@@ -406,6 +447,8 @@ function isSubmissionRecordValue(value: unknown): boolean {
 /** Valide un état de partie reçu par le réseau avant de l’appliquer. */
 export function isGameState(value: unknown): value is GameState {
   if (!isRecord(value)) return false;
+  if (!isGameMode(value.mode)) return false;
+  const mode = value.mode;
   if (typeof value.phase !== 'string' || !GAME_PHASES.includes(value.phase as GamePhase)) {
     return false;
   }
@@ -423,13 +466,18 @@ export function isGameState(value: unknown): value is GameState {
       return false;
     }
   }
-  if (value.pendingSubmission !== undefined && !isPendingSubmissionValue(value.pendingSubmission)) {
+  if (
+    value.pendingSubmission !== undefined &&
+    !isPendingSubmissionValue(value.pendingSubmission, mode)
+  ) {
     return false;
   }
   if (!Array.isArray(value.scans) || value.scans.length > 2000) return false;
-  if (!value.scans.every(isScanRecordValue)) return false;
+  if (!value.scans.every((scan) => isScanRecordValue(scan, mode))) return false;
   if (!Array.isArray(value.submissions) || value.submissions.length > 200) return false;
-  if (!value.submissions.every(isSubmissionRecordValue)) return false;
+  if (!value.submissions.every((submission) => isSubmissionRecordValue(submission, mode))) {
+    return false;
+  }
   if (value.winner !== undefined && value.winner !== 'draw' && !isPlayerIdValue(value.winner)) {
     return false;
   }

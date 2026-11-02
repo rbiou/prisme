@@ -2,17 +2,21 @@
 
 Cette page est la référence fonctionnelle du jeu. Elle reformule les règles de
 la boîte de base pour deux joueurs et précise les choix d'adaptation propres à
-l'application. Les schémas et libellés sont originaux.
+l'application, y compris le mode optionnel avec les deux gemmes spéciales. Les
+schémas et libellés sont originaux.
 
 ## 1. Matériel
 
 - Un plateau de mine de **10 colonnes × 8 lignes**.
-- Cinq gemmes par joueur :
+- Cinq gemmes par joueur en mode de base :
   - une gemme **rouge** en forme de parallélogramme ;
   - une gemme **jaune** en forme de petit triangle rectangle ;
   - une gemme **bleue** en forme de grand triangle isocèle rectangle ;
   - une gemme **blanche** en forme de grand triangle isocèle rectangle ;
   - une gemme **blanche** en forme de losange.
+- En mode spécial, deux gemmes supplémentaires par joueur :
+  - le **Diamant**, rectangle de deux cases, blanc et brillant ;
+  - le **Corps noir**, rectangle de deux cases, noir.
 - Une grille de prospection pour noter les hypothèses.
 - Un moyen de tirer des rayons depuis le bord du plateau.
 
@@ -21,10 +25,9 @@ Les proportions des pièces sont définies en unités de case dans
 
 ## 2. But
 
-Chaque joueur cache une mine. Les deux joueurs sont à la fois **maître de la
-mine** de l'adversaire et **prospecteur** de leur propre mine. Le premier qui
-reconstitue exactement la mine adverse gagne, selon la procédure de fin de
-partie décrite plus bas.
+Chaque joueur cache une mine. Chaque joueur est **maître de sa propre mine** et
+**prospecteur de la mine adverse**. Le premier qui reconstitue exactement la
+mine adverse gagne, selon la procédure de fin de partie décrite plus bas.
 
 ## 3. Coordonnées
 
@@ -58,15 +61,34 @@ intersections de la grille.
 | Bleue            | triangle isocèle rectangle, base = 4, hauteur = 2      | 4 × 2            | 4 cases |
 | Blanche triangle | même forme que la bleue                                | 4 × 2            | 4 cases |
 | Blanche losange  | carré tourné à 45°, diagonales 2 × 2                   | 2 × 2            | 2 cases |
+| Diamant          | rectangle 2 × 1                                        | 2 × 1            | 2 cases |
+| Corps noir       | rectangle 2 × 1                                        | 2 × 1            | 2 cases |
 
 Les pièces peuvent être tournées par pas de **90°**. Elles ne peuvent pas être
 retournées. Le parallélogramme rouge est chiral dans le plan : le retourner
 donnerait une orientation impossible à obtenir par rotation.
 
+## 4 bis. Gemmes spéciales
+
+Le mode spécial est une option choisie par l'hôte dans les réglages, avant la
+création du salon. L'invité suit toujours le mode annoncé par l'hôte. Le mode de
+base à cinq gemmes reste le mode par défaut.
+
+- Le **Diamant** réfléchit le rayon comme n'importe quelle gemme, mais n'ajoute
+  aucune couleur à l'ensemble des couleurs rencontrées.
+- Le **Corps noir** absorbe le rayon. La réponse est alors « Le signal a été
+  absorbé » au lieu d'un point de sortie et d'une couleur.
+- Les deux gemmes spéciales se placent, tournent et se déplacent comme les
+  autres, avec les mêmes contraintes de grille, de contact et d'accessibilité.
+- Un scan de case sur le Diamant répond « Diamant » ; sur le Corps noir, il
+  répond « Le signal a été absorbé ».
+- En mode spécial, une mine complète contient les sept gemmes, chacune une fois.
+
 ## 5. Placement secret
 
-Chaque joueur place ses cinq gemmes dans sa mine, à l'abri du regard de
-l'adversaire, en respectant toutes les contraintes suivantes.
+Chaque joueur place ses cinq gemmes — ou ses sept gemmes en mode spécial — dans
+sa mine, à l'abri du regard de l'adversaire, en respectant toutes les contraintes
+suivantes.
 
 1. **Grille** : chaque sommet d'une gemme coïncide avec une intersection de la
    grille. Les arêtes sont horizontales, verticales ou à 45°.
@@ -121,13 +143,16 @@ traverse jamais une gemme.
   entières et les rayons circulent sur des lignes à demi-entiers.
 
 Le rayon sort du plateau dès qu'il atteint un bord. Le point de sortie est
-annoncé avec son étiquette (`1`–`10`, `11`–`18`, `A`–`H` ou `I`–`R`).
+annoncé avec son étiquette (`1`–`10`, `11`–`18`, `A`–`H` ou `I`–`R`). En mode
+spécial, si le rayon rencontre le Corps noir, il est absorbé et aucun point de
+sortie n'est annoncé.
 
 ### 6.3 Couleur
 
 Le rayon part **incolore**. Chaque gemme touchée ajoute sa couleur à l'ensemble
 des couleurs rencontrées. Une couleur déjà rencontrée ne compte qu'une fois,
-même si le rayon touche plusieurs gemmes de cette couleur.
+même si le rayon touche plusieurs gemmes de cette couleur. Le Diamant réfléchit
+le rayon sans ajouter de couleur.
 
 | Couleurs rencontrées         | Couleur annoncée |
 | ---------------------------- | ---------------- |
@@ -196,24 +221,26 @@ la confirme. La confirmation est ajoutée au journal public.
 Le maître de la mine annonce :
 
 - « Rien » si la case ne contient aucune gemme ;
-- « Une gemme rouge », « Une gemme blanche », etc. sinon.
+- « Une gemme rouge », « Une gemme blanche », etc. sinon ;
+- « Diamant » si la case est couverte par le Diamant ;
+- « Le signal a été absorbé » si la case est couverte par le Corps noir.
 
 Une case peut être partiellement couverte par plusieurs gemmes. Pour rendre la
 réponse déterministe, l'application retient la gemme qui couvre la **plus
 grande surface** de la case. En cas d'égalité, elle regarde le centre de la
-case ; si le centre est encore ambigu, elle applique l'ordre fixe rouge, jaune,
-bleu, blanc. Ce choix est une adaptation explicite : le livret ne tranche pas
-les cas de recouvrement partiel multiple.
+case ; si le centre est encore ambigu, elle applique un ordre fixe des pièces.
+Ce choix est une adaptation explicite : le livret ne tranche pas les cas de
+recouvrement partiel multiple.
 
 ### 7.5 Proposition de mine
 
-Le prospecteur place ses cinq pièces candidates sur la grille de solution,
-puis soumet la disposition complète : formes, orientations et positions. La
+Le prospecteur place ses pièces candidates sur la grille de solution, puis
+soumet la disposition complète : formes, orientations et positions. La
 proposition est comparée à la mine secrète par le maître de la mine.
 
-Une proposition doit contenir exactement les cinq gemmes de la base, chacune
-une fois. Une proposition incomplète ou invalide est considérée comme
-incorrecte.
+Une proposition doit contenir exactement les gemmes du mode en cours, chacune
+une fois : cinq en mode de base, sept en mode spécial. Une proposition
+incomplète, invalide ou d'un autre mode est considérée comme incorrecte.
 
 ## 8. Fin de partie
 
@@ -250,9 +277,9 @@ joueurs, mais elle décourage la modification de mine en cours de partie.
   interdite. Option activée par défaut, désactivable pour suivre strictement le
   livret fourni.
 - **Extension Diamant** : une gemme transparente qui ne change pas la couleur.
-  Non incluse dans le MVP.
-- **Extension Corps noir** : une gemme qui absorbe le rayon. Non incluse dans le
-  MVP.
+  Incluse dans le mode spécial optionnel.
+- **Extension Corps noir** : une gemme qui absorbe le rayon. Incluse dans le
+  mode spécial optionnel.
 - **Trois joueurs et plus** : un maître de la mine unique, plusieurs
   prospecteurs. Non incluse dans le MVP.
 

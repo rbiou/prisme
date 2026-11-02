@@ -9,6 +9,7 @@ import { simulateRay } from '../engine/ray';
 import { validateMine } from '../engine/placement';
 import type {
   Cell,
+  GameMode,
   GameState,
   Mine,
   PlayerId,
@@ -189,6 +190,7 @@ function snapshotFromState(
     roomCode: state.roomCode,
     nonce,
     sessionPhase,
+    mode: state.mode,
     locked: state.locked
       ? {
           mine: serializeMine(state.locked.mine),
@@ -296,7 +298,12 @@ export function useMatch(settings: Settings): UseMatchResult {
   }, []);
 
   const createSession = useCallback(
-    (role: PlayerId, name: string, nonce: string = randomHex(16)): MatchSession => {
+    (
+      role: PlayerId,
+      name: string,
+      nonce: string = randomHex(16),
+      mode: GameMode = settings.gameMode,
+    ): MatchSession => {
       nonceRef.current = nonce;
       let session: MatchSession | null = null;
       session = new MatchSession(
@@ -390,10 +397,11 @@ export function useMatch(settings: Settings): UseMatchResult {
             }
           },
         },
+        { mode },
       );
       return session;
     },
-    [sendSyncState],
+    [sendSyncState, settings.gameMode],
   );
 
   const hostGame = useCallback(
@@ -405,8 +413,8 @@ export function useMatch(settings: Settings): UseMatchResult {
       resumeRef.current = null;
       setResumable(false);
       const name = playerName.trim() || 'Joueur';
-      dispatch({ type: 'begin', role: 'host', playerName: name });
-      const session = createSession('host', name);
+      dispatch({ type: 'begin', role: 'host', playerName: name, mode: settings.gameMode });
+      const session = createSession('host', name, randomHex(16), settings.gameMode);
       sessionRef.current = session;
       try {
         const code = await session.host();
@@ -418,7 +426,7 @@ export function useMatch(settings: Settings): UseMatchResult {
         return { ok: false, error: message };
       }
     },
-    [closeSession, createSession],
+    [closeSession, createSession, settings.gameMode],
   );
 
   const joinGame = useCallback(
@@ -436,9 +444,9 @@ export function useMatch(settings: Settings): UseMatchResult {
       resumeRef.current = null;
       setResumable(false);
       const name = playerName.trim() || 'Joueur';
-      dispatch({ type: 'begin', role: 'guest', playerName: name });
+      dispatch({ type: 'begin', role: 'guest', playerName: name, mode: settings.gameMode });
       dispatch({ type: 'room-code', code: normalized });
-      const session = createSession('guest', name);
+      const session = createSession('guest', name, randomHex(16), settings.gameMode);
       sessionRef.current = session;
       try {
         await session.join(normalized);
@@ -449,7 +457,7 @@ export function useMatch(settings: Settings): UseMatchResult {
         return { ok: false, error: message };
       }
     },
-    [closeSession, createSession],
+    [closeSession, createSession, settings.gameMode],
   );
 
   const resumeGame = useCallback(async (): Promise<ActionResult> => {
@@ -486,6 +494,7 @@ export function useMatch(settings: Settings): UseMatchResult {
       role: stored.role,
       playerName: stored.playerName,
       roomCode: stored.roomCode,
+      mode: stored.mode,
       sessionPhase: stored.sessionPhase,
       locked,
       starter: stored.starter,
@@ -498,7 +507,7 @@ export function useMatch(settings: Settings): UseMatchResult {
     };
     stateRef.current = matchReducer(initialMatchState, { type: 'hydrate', data });
     dispatch({ type: 'hydrate', data });
-    const session = createSession(stored.role, stored.playerName, stored.nonce);
+    const session = createSession(stored.role, stored.playerName, stored.nonce, stored.mode);
     sessionRef.current = session;
     resumeRef.current = stored;
     lastSeenRef.current = Date.now();
@@ -537,6 +546,7 @@ export function useMatch(settings: Settings): UseMatchResult {
         return { ok: false, error: 'La partie n’a pas encore été lancée par l’hôte.' };
       }
       const validation = validateMine(mine, {
+        mode: current.mode,
         enforceWhiteSymmetry: settings.enforceWhiteSymmetry,
       });
       if (!validation.ok) {
@@ -663,42 +673,67 @@ export function useMatch(settings: Settings): UseMatchResult {
     let answer: ScanAnswer;
     if (pending.kind === 'wave' && pending.entry) {
       const result = simulateRay(mine, pending.entry);
-      if (!result.exit) {
+      if (result.status === 'loop' || !result.exit) {
         dispatch({
           type: 'error',
           message: 'Cette mine produit une boucle de rayon : répondez impossible.',
         });
         return false;
       }
-      answer = { kind: 'wave', exit: result.exit, color: result.color };
+      answer =
+        result.status === 'absorbed'
+          ? { kind: 'wave', absorbed: true }
+          : { kind: 'wave', exit: result.exit, color: result.color };
     } else if (pending.kind === 'cell' && pending.cell) {
       const result = scanCell(mine, pending.cell);
-      answer = { kind: 'cell', color: result.color };
+      answer = result.special
+        ? { kind: 'cell', special: result.special }
+        : { kind: 'cell', color: result.color };
     } else {
       return false;
     }
 
     const message: NetworkMessage =
       answer.kind === 'wave'
-        ? {
-            protocol: PROTOCOL_VERSION,
-            type: 'answer',
-            id: newMessageId(),
-            from: role,
-            scanId: pending.id,
-            kind: 'wave',
-            exit: answer.exit.label,
-            color: answer.color,
-          }
-        : {
-            protocol: PROTOCOL_VERSION,
-            type: 'answer',
-            id: newMessageId(),
-            from: role,
-            scanId: pending.id,
-            kind: 'cell',
-            color: answer.color,
-          };
+        ? answer.absorbed === true
+          ? {
+              protocol: PROTOCOL_VERSION,
+              type: 'answer',
+              id: newMessageId(),
+              from: role,
+              scanId: pending.id,
+              kind: 'wave',
+              absorbed: true,
+            }
+          : {
+              protocol: PROTOCOL_VERSION,
+              type: 'answer',
+              id: newMessageId(),
+              from: role,
+              scanId: pending.id,
+              kind: 'wave',
+              exit: answer.exit.label,
+              color: answer.color,
+            }
+        : answer.special
+          ? {
+              protocol: PROTOCOL_VERSION,
+              type: 'answer',
+              id: newMessageId(),
+              from: role,
+              scanId: pending.id,
+              kind: 'cell',
+              special: answer.special,
+            }
+          : {
+              protocol: PROTOCOL_VERSION,
+              type: 'answer',
+              id: newMessageId(),
+              from: role,
+              scanId: pending.id,
+              kind: 'cell',
+              color: answer.color,
+            };
 
     if (!session.send(message)) {
       dispatch({ type: 'error', message: 'La réponse n’a pas pu être envoyée.' });
@@ -747,41 +782,67 @@ export function useMatch(settings: Settings): UseMatchResult {
     let answer: ScanAnswer;
     if (original.kind === 'wave' && original.entry) {
       const result = simulateRay(mine, original.entry);
-      if (!result.exit) {
+      if (result.status === 'loop' || !result.exit) {
         dispatch({
           type: 'error',
           message: 'Cette mine produit une boucle de rayon : confirmation impossible.',
         });
         return false;
       }
-      answer = { kind: 'wave', exit: result.exit, color: result.color };
+      answer =
+        result.status === 'absorbed'
+          ? { kind: 'wave', absorbed: true }
+          : { kind: 'wave', exit: result.exit, color: result.color };
     } else if (original.kind === 'cell' && original.cell) {
-      answer = { kind: 'cell', color: scanCell(mine, original.cell).color };
+      const result = scanCell(mine, original.cell);
+      answer = result.special
+        ? { kind: 'cell', special: result.special }
+        : { kind: 'cell', color: result.color };
     } else {
       return false;
     }
 
     const message: NetworkMessage =
       answer.kind === 'wave'
-        ? {
-            protocol: PROTOCOL_VERSION,
-            type: 'confirm-result',
-            id: newMessageId(),
-            from: role,
-            answerId: original.id,
-            kind: 'wave',
-            exit: answer.exit.label,
-            color: answer.color,
-          }
-        : {
-            protocol: PROTOCOL_VERSION,
-            type: 'confirm-result',
-            id: newMessageId(),
-            from: role,
-            answerId: original.id,
-            kind: 'cell',
-            color: answer.color,
-          };
+        ? answer.absorbed === true
+          ? {
+              protocol: PROTOCOL_VERSION,
+              type: 'confirm-result',
+              id: newMessageId(),
+              from: role,
+              answerId: original.id,
+              kind: 'wave',
+              absorbed: true,
+            }
+          : {
+              protocol: PROTOCOL_VERSION,
+              type: 'confirm-result',
+              id: newMessageId(),
+              from: role,
+              answerId: original.id,
+              kind: 'wave',
+              exit: answer.exit.label,
+              color: answer.color,
+            }
+        : answer.special
+          ? {
+              protocol: PROTOCOL_VERSION,
+              type: 'confirm-result',
+              id: newMessageId(),
+              from: role,
+              answerId: original.id,
+              kind: 'cell',
+              special: answer.special,
+            }
+          : {
+              protocol: PROTOCOL_VERSION,
+              type: 'confirm-result',
+              id: newMessageId(),
+              from: role,
+              answerId: original.id,
+              kind: 'cell',
+              color: answer.color,
+            };
 
     if (!session.send(message)) {
       dispatch({ type: 'error', message: 'La confirmation n’a pas pu être envoyée.' });
@@ -840,7 +901,7 @@ export function useMatch(settings: Settings): UseMatchResult {
     if (!game || !role || !mine || !session || !pending) return false;
     if (pending.by === role) return false;
 
-    const correct = checkSolution(pending.candidate, mine).correct;
+    const correct = checkSolution(pending.candidate, mine, current.mode).correct;
     const message: NetworkMessage = {
       protocol: PROTOCOL_VERSION,
       type: 'submit-result',

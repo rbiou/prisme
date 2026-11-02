@@ -7,7 +7,7 @@
 - Transport des données : un seul `RTCDataChannel` fiable et ordonné, label
   `prisme`, une fois la connexion WebRTC directe établie.
 - Encodage : JSON UTF-8.
-- Version : `protocol: 3` dans chaque message.
+- Version : `protocol: 4` dans chaque message.
 - Les messages sont validés avant application. Un message invalide est ignoré
   et journalisé.
 - Les deux clients maintiennent le même état public. La mine et les notes ne
@@ -33,6 +33,8 @@
 type PlayerId = 'host' | 'guest';
 type EntryLabel = '1'..'10' | '11'..'18' | 'A'..'H' | 'I'..'R';
 type GemColor = 'red' | 'yellow' | 'blue' | 'white';
+type SpecialPieceKind = 'clear-diamond' | 'black-body';
+type GameMode = 'base' | 'special';
 type RayColor =
   | 'transparent' | 'white' | 'red' | 'yellow' | 'blue'
   | 'orange' | 'violet' | 'green' | 'black'
@@ -54,68 +56,90 @@ type SerializedMine = {
 
 ## 4. Messages
 
+### 4.0 Mode de partie
+
+Le protocole 4 introduit `GameMode = 'base' | 'special'`. Le mode est choisi par
+l'hôte avant la création du salon, puis annoncé dans `hello`, `lobby-start` et
+`start`. L'invité ne négocie pas : il adopte le mode de l'hôte. `sync` transporte
+le mode dans `game.mode` et le client refuse un état dont le mode diffère du mode
+négocié. Une sauvegarde de reprise antérieure au protocole 4 est relue en mode
+`base`.
+
 ### 4.1 Présentation et salon
 
 ```ts
-{ protocol: 3, type: 'hello', from: PlayerId, name: string, nonce: string }
+{ protocol: 4, type: 'hello', from: PlayerId, name: string, nonce: string,
+  mode: GameMode }
 ```
 
 - `name` : nom affiché, court, facultatif (chaîne vide acceptée).
 - `nonce` : 32 caractères hexadécimaux, généré au début de la session.
+- `mode` : mode de partie annoncé par l'hôte. L'invité adopte toujours le mode
+  reçu de l'hôte, même si son réglage local diffère.
 
 Chaque client envoie `hello` dès l'ouverture du canal. La réception du `hello`
 distant fait passer la session en phase `lobby` et résout la connexion de
 l'invité.
 
 ```ts
-{ protocol: 3, type: 'lobby-start', id: string, from: 'host' }
+{ protocol: 4, type: 'lobby-start', id: string, from: 'host', mode: GameMode }
 ```
 
 L'hôte envoie ce message quand il clique **Lancer la partie**. Les deux clients
-passent en phase `placing` et affichent l'écran de composition de la mine.
+passent en phase `placing`, affichent l'écran de composition de la mine et
+utilisent le mode annoncé.
 
 ```ts
-{ protocol: 3, type: 'commit', id: string, from: PlayerId, mineHash: string }
+{ protocol: 4, type: 'commit', id: string, from: PlayerId, mineHash: string }
 ```
 
 Chaque joueur envoie l'engagement SHA-256 de sa mine après l'avoir verrouillée.
 `mineHash` fait 64 caractères hexadécimaux.
 
 ```ts
-{ protocol: 3, type: 'start', from: 'host', starter: PlayerId,
+{ protocol: 4, type: 'start', from: 'host', starter: PlayerId,
   hostNonce: string, guestNonce: string,
-  hostHash: string, guestHash: string }
+  hostHash: string, guestHash: string, mode: GameMode }
 ```
 
 L'hôte envoie `start` quand il possède son propre engagement et celui de
-l'invité. L'invité vérifie les nonces, les deux hashes et le calcul du premier
-joueur. Les deux clients initialisent alors le même état de partie.
+l'invité. L'invité vérifie les nonces, les deux hashes, le mode et le calcul du
+premier joueur. Les deux clients initialisent alors le même état de partie.
 
 ### 4.2 Scans
 
 ```ts
-{ protocol: 3, type: 'scan', id: string, from: PlayerId,
+{ protocol: 4, type: 'scan', id: string, from: PlayerId,
   kind: 'wave', entry: EntryLabel }
 
-{ protocol: 3, type: 'scan', id: string, from: PlayerId,
+{ protocol: 4, type: 'scan', id: string, from: PlayerId,
   kind: 'cell', cell: Cell }
 ```
 
 Le prospecteur envoie un scan. Le défenseur calcule la réponse localement.
 
 ```ts
-{ protocol: 3, type: 'answer', id: string, from: PlayerId,
+{ protocol: 4, type: 'answer', id: string, from: PlayerId,
   scanId: string, kind: 'wave', exit: EntryLabel, color: RayColor }
 
-{ protocol: 3, type: 'answer', id: string, from: PlayerId,
+{ protocol: 4, type: 'answer', id: string, from: PlayerId,
+  scanId: string, kind: 'wave', absorbed: true }
+
+{ protocol: 4, type: 'answer', id: string, from: PlayerId,
   scanId: string, kind: 'cell', color: GemColor | null }
+
+{ protocol: 4, type: 'answer', id: string, from: PlayerId,
+  scanId: string, kind: 'cell', special: SpecialPieceKind }
 ```
 
 Le défenseur confirme puis envoie la réponse. Aucune trajectoire n'est incluse.
-Les deux clients ajoutent la réponse au journal et passent le tour.
+La variante `absorbed: true` remplace `exit` et `color` lorsque le rayon
+rencontre le Corps noir ; la variante `special` remplace `color` lorsqu'un scan
+de case couvre le Diamant ou le Corps noir. Les deux clients ajoutent la réponse
+au journal et passent le tour.
 
 ```ts
-{ protocol: 3, type: 'cancel-scan', id: string, from: PlayerId,
+{ protocol: 4, type: 'cancel-scan', id: string, from: PlayerId,
   scanId: string }
 ```
 
@@ -125,14 +149,20 @@ Le tour ne change pas.
 ### 4.3 Confirmation gratuite
 
 ```ts
-{ protocol: 3, type: 'confirm-request', id: string, from: PlayerId,
+{ protocol: 4, type: 'confirm-request', id: string, from: PlayerId,
   answerId: string }
 
-{ protocol: 3, type: 'confirm-result', id: string, from: PlayerId,
+{ protocol: 4, type: 'confirm-result', id: string, from: PlayerId,
   answerId: string, kind: 'wave', exit: EntryLabel, color: RayColor }
 
-{ protocol: 3, type: 'confirm-result', id: string, from: PlayerId,
+{ protocol: 4, type: 'confirm-result', id: string, from: PlayerId,
+  answerId: string, kind: 'wave', absorbed: true }
+
+{ protocol: 4, type: 'confirm-result', id: string, from: PlayerId,
   answerId: string, kind: 'cell', color: GemColor | null }
+
+{ protocol: 4, type: 'confirm-result', id: string, from: PlayerId,
+  answerId: string, kind: 'cell', special: SpecialPieceKind }
 ```
 
 La confirmation ne change ni le tour ni la phase. Elle est ajoutée au journal
@@ -141,10 +171,10 @@ comme entrée distincte.
 ### 4.4 Proposition
 
 ```ts
-{ protocol: 3, type: 'submit', id: string, from: PlayerId,
+{ protocol: 4, type: 'submit', id: string, from: PlayerId,
   candidate: SerializedMine }
 
-{ protocol: 3, type: 'submit-result', id: string, from: PlayerId,
+{ protocol: 4, type: 'submit-result', id: string, from: PlayerId,
   submissionId: string, correct: boolean }
 ```
 
@@ -155,23 +185,24 @@ incorrecte termine immédiatement la partie.
 ### 4.5 Révélation
 
 ```ts
-{ protocol: 3, type: 'reveal', id: string, from: PlayerId,
+{ protocol: 4, type: 'reveal', id: string, from: PlayerId,
   mine: SerializedMine, salt: string,
   notes?: SerializedNote | null,
   marks?: { crosses: Cell[], edges: NoteEdgeMark[], colors: ColorMark[] } | null }
 ```
 
 Envoyé après la fin de partie. `notes` contient de zéro à cinq pièces
-candidates : les notes finales du joueur, partagées uniquement à ce moment pour
-expliquer son raisonnement. `marks` contient les croix, arêtes et ronds de
-couleur de ses notes. Le destinataire vérifie :
+candidates en mode de base, ou de zéro à sept en mode spécial : les notes
+finales du joueur, partagées uniquement à ce moment pour expliquer son
+raisonnement. `marks` contient les croix, arêtes et ronds de couleur de ses
+notes. Le destinataire vérifie :
 `SHA-256(canonicalMine + ':' + salt) === mineHash` reçu dans `commit` et
 `start`. Il peut ensuite rejouer les scans et comparer les réponses.
 
 ### 4.6 Reprise
 
 ```ts
-{ protocol: 3, type: 'sync', id: string, from: PlayerId,
+{ protocol: 4, type: 'sync', id: string, from: PlayerId,
   round: number,
   mineHash: string | null,
   starter: PlayerId | null,
@@ -184,14 +215,15 @@ couleur de ses notes. Le destinataire vérifie :
 l'application. Chaque client envoie son état public et les révélations déjà
 reçues. `round` vaut le nombre de scans et de propositions appliqués. Le client
 qui a le `round` le plus faible adopte l'état de l'autre ; à égalité, les états
-sont considérés identiques. `mineHash` est l'engagement du joueur qui envoie le
-message. La mine secrète n'est jamais incluse.
+sont considérés identiques. `game.mode` porte le mode de la partie et doit
+correspondre au mode négocié. `mineHash` est l'engagement du joueur qui envoie
+le message. La mine secrète n'est jamais incluse.
 
 ### 4.7 Contrôle
 
 ```ts
-{ protocol: 3, type: 'ping', id: string, from: PlayerId }
-{ protocol: 3, type: 'pong', id: string, from: PlayerId, replyTo: string }
+{ protocol: 4, type: 'ping', id: string, from: PlayerId }
+{ protocol: 4, type: 'pong', id: string, from: PlayerId, replyTo: string }
 ```
 
 `ping` toutes les 15 secondes. Une absence de message pendant 30 secondes
@@ -207,10 +239,10 @@ Hôte                                      Invité
  |                                         |-- saisit 123 456
  |                                         |-- se connecte à prisme-v1-123456
  |<=========== canal WebRTC direct =========>|
- |-- hello ------------------------------->|
+ |-- hello (mode) ------------------------>|
  |<------------------------------ hello ---|
- |   (salon : adversaire connecté)          |
- |-- lobby-start ------------------------->|
+ |   (salon : adversaire connecté, mode)    |
+ |-- lobby-start (mode) ------------------>|
  |   (placement des deux mines)             |
  |-- commit ------------------------------>|
  |<----------------------------- commit ---|
@@ -224,8 +256,10 @@ Détails :
    code, jusqu'à huit tentatives.
 2. L'invité ouvre un pair anonyme, puis se connecte à `prisme-v1-<code>`.
 3. À l'ouverture du canal, chacun envoie `hello`. L'hôte attend le `hello` de
-   l'invité avant d'afficher le bouton de lancement.
-4. L'hôte envoie `lobby-start`. Les deux joueurs placent leur mine.
+   l'invité avant d'afficher le bouton de lancement. L'invité adopte le mode
+   annoncé par l'hôte.
+4. L'hôte envoie `lobby-start`. Les deux joueurs placent leur mine dans le mode
+   convenu.
 5. Chaque joueur envoie `commit` après verrouillage.
 6. Quand l'hôte a les deux engagements, il envoie `start`. La partie commence.
 7. Délais : 15 s pour l'enregistrement PeerJS, 20 s pour rejoindre le salon ou
@@ -287,21 +321,26 @@ Prospecteur                  Défenseur
 
 ## 8. Règles de validation
 
-- `protocol` doit valoir `3`.
+- `protocol` doit valoir `4`.
 - `type` doit être connu.
 - `from` doit être le rôle distant attendu.
 - Les identifiants doivent être des chaînes non vides, de longueur ≤ 64.
 - `entry` doit être une étiquette valide.
 - `cell.col` ∈ [0, 9], `cell.row` ∈ [0, 7].
 - `color` doit appartenir à l'union `RayColor` ou `GemColor | null` selon le
-  type.
-- `candidate` doit contenir exactement les cinq types de pièces, une fois
-  chacun, avec des coordonnées entières et des rotations 0–3.
+  type. Une réponse `absorbed` n'a ni `exit` ni `color` ; une réponse `special`
+  n'a pas de `color`.
+- `candidate` doit contenir exactement les cinq types de pièces de base, ou les
+  sept types du mode spécial, une fois chacun, avec des coordonnées entières et
+  des rotations 0–3. Le mode de la partie tranche.
 - `nonce` doit faire 32 caractères hexadécimaux ; `mineHash` 64 ; `salt` 32.
+- `mode` doit valoir `base` ou `special`. `hello`, `lobby-start`, `start` et
+  `sync.game.mode` doivent rester cohérents avec le mode négocié.
 - Un `sync` doit contenir un `round` entier positif et un `game` structurellement
   valide (phases, tours, scans, propositions, gagnant).
-- `notes` accepte de zéro à cinq pièces candidates, sans doublon de type, avec
-  rotation 0–3 et coordonnées entières.
+- `notes` accepte de zéro à cinq pièces candidates en mode de base, ou de zéro à
+  sept en mode spécial, sans doublon de type, avec rotation 0–3 et coordonnées
+  entières.
 - `marks` ne peut contenir que des cases, arêtes et ronds valides, dans les
   limites du plateau ; les tableaux sont bornés.
 - Un message dont le `id` a déjà été vu est ignoré.
@@ -313,6 +352,7 @@ Prospecteur                  Défenseur
 | --------------------------------- | --------------------------------------------------------- |
 | Message JSON invalide             | Ignoré, avertissement local.                              |
 | Version inconnue                  | Message ignoré.                                           |
+| Mode incohérent                   | Message ignoré, avertissement local.                      |
 | Code de salon inconnu             | « Aucune partie ne porte ce code », retour à l'accueil.   |
 | Code déjà réservé                 | Nouveau code tiré automatiquement.                        |
 | Scan hors tour                    | Ignoré ; le prospecteur reçoit un avertissement.          |

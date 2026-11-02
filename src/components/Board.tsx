@@ -15,10 +15,23 @@ import {
   sideLabel,
 } from '../engine/board';
 import type { ColorMark } from '../engine/colorMarks';
-import { RAY_COLOR_SWATCHES } from '../engine/colors';
+import {
+  NOTE_COLOR_SWATCHES,
+  RAY_COLOR_SWATCHES,
+  SPECIAL_COLOR_LABELS,
+  SPECIAL_COLOR_SWATCHES,
+} from '../engine/colors';
 import { edgeSegment, type NoteEdgeMark } from '../engine/noteEdges';
-import { labelForKind, piecePolygon } from '../engine/pieces';
-import type { Cell, GemColor, Mine, PlacedPiece, Point, RayColor } from '../engine/types';
+import { isSpecialPieceKind, labelForKind, piecePolygon } from '../engine/pieces';
+import type {
+  Cell,
+  GemColor,
+  Mine,
+  PlacedPiece,
+  Point,
+  RayColor,
+  SpecialPieceKind,
+} from '../engine/types';
 
 const GEM_FILL: Record<GemColor, string> = {
   red: '#ef4444',
@@ -26,6 +39,33 @@ const GEM_FILL: Record<GemColor, string> = {
   blue: '#3b82f6',
   white: '#e2e8f0',
 };
+
+const SPECIAL_FILL: Record<SpecialPieceKind, string> = {
+  'clear-diamond': '#f8fbff',
+  'black-body': SPECIAL_COLOR_SWATCHES['black-body'],
+};
+
+function specialKindOf(piece: PlacedPiece): SpecialPieceKind | null {
+  return isSpecialPieceKind(piece.kind) ? piece.kind : null;
+}
+
+function solidFillFor(piece: PlacedPiece): string {
+  if (piece.color) return GEM_FILL[piece.color];
+  const special = specialKindOf(piece);
+  return special ? SPECIAL_FILL[special] : '#e2e8f0';
+}
+
+function patternFor(piece: PlacedPiece): string {
+  if (piece.color) return `url(#gem-${piece.color})`;
+  const special = specialKindOf(piece);
+  return special ? `url(#gem-${special})` : 'none';
+}
+
+function pieceTitle(piece: PlacedPiece): string {
+  const special = specialKindOf(piece);
+  if (special) return `${labelForKind(piece.kind)} — ${SPECIAL_COLOR_LABELS[special]}`;
+  return `${labelForKind(piece.kind)} — ${piece.color ?? 'incolore'}`;
+}
 
 export interface BoardPoint {
   x: number;
@@ -188,6 +228,29 @@ function PatternDefs() {
           />
         </pattern>
       ))}
+      <radialGradient id="gem-clear-diamond" cx="38%" cy="32%" r="78%">
+        <stop offset="0%" stopColor="#ffffff" />
+        <stop offset="55%" stopColor="#f0f9ff" />
+        <stop offset="100%" stopColor="#bae6fd" />
+      </radialGradient>
+      <pattern
+        id="gem-black-body"
+        width="0.34"
+        height="0.34"
+        patternUnits="userSpaceOnUse"
+        patternTransform="rotate(45)"
+      >
+        <rect width="0.34" height="0.34" fill={SPECIAL_FILL['black-body']} />
+        <line
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="0.34"
+          stroke="#64748b"
+          strokeOpacity="0.45"
+          strokeWidth="0.035"
+        />
+      </pattern>
     </defs>
   );
 }
@@ -411,18 +474,36 @@ export function Board({
         >
           <polygon
             points={polygonPoints(piecePolygon(piece))}
-            fill={GEM_FILL[piece.color]}
-            className="board-gem-solid"
+            fill={solidFillFor(piece)}
+            className={`board-gem-solid${specialKindOf(piece) ? ` board-gem-solid--${specialKindOf(piece)}` : ''}`}
           />
           <polygon
             points={polygonPoints(piecePolygon(piece))}
-            fill={`url(#gem-${piece.color})`}
-            stroke={piece.color === 'white' ? '#f8fafc' : '#0b1220'}
-            strokeWidth="0.045"
+            fill={patternFor(piece)}
+            stroke={
+              specialKindOf(piece) === 'clear-diamond'
+                ? '#7dd3fc'
+                : piece.color === 'white'
+                  ? '#f8fafc'
+                  : '#0b1220'
+            }
+            strokeWidth={specialKindOf(piece) === 'clear-diamond' ? '0.06' : '0.045'}
             strokeLinejoin="round"
           >
-            <title>{`${labelForKind(piece.kind)} — ${piece.color === 'white' ? 'blanc' : piece.color}`}</title>
+            <title>{pieceTitle(piece)}</title>
           </polygon>
+          {specialKindOf(piece) === 'clear-diamond' ? (
+            <polygon
+              points={polygonPoints(piecePolygon(piece))}
+              fill="none"
+              stroke="#e0f2fe"
+              strokeOpacity="0.55"
+              strokeWidth="0.16"
+              strokeLinejoin="round"
+              className="board-gem-aura"
+              aria-hidden="true"
+            />
+          ) : null}
         </g>
       ))}
 
@@ -430,12 +511,12 @@ export function Board({
         <g className={`board-ghost${ghostValid ? ' is-valid' : ' is-invalid'}`} aria-hidden="true">
           <polygon
             points={polygonPoints(piecePolygon(ghostPiece))}
-            fill={GEM_FILL[ghostPiece.color]}
+            fill={solidFillFor(ghostPiece)}
             className="board-ghost-solid"
           />
           <polygon
             points={polygonPoints(piecePolygon(ghostPiece))}
-            fill={`url(#gem-${ghostPiece.color})`}
+            fill={patternFor(ghostPiece)}
             className="board-ghost-pattern"
           />
         </g>
@@ -451,7 +532,7 @@ export function Board({
                 <line {...segment} className="board-edge-casing" />
                 <line
                   {...segment}
-                  stroke={RAY_COLOR_SWATCHES[mark.color]}
+                  stroke={NOTE_COLOR_SWATCHES[mark.color]}
                   className="board-edge-line"
                 />
               </g>
@@ -468,7 +549,7 @@ export function Board({
               cx={mark.cell.col + 0.5}
               cy={mark.cell.row + 0.5}
               r="0.22"
-              fill={RAY_COLOR_SWATCHES[mark.color]}
+              fill={NOTE_COLOR_SWATCHES[mark.color]}
             />
           ))}
         </g>

@@ -19,6 +19,12 @@ export const VALID_PIECES = [
   piece('white-diamond', 0, 4, 3),
 ];
 
+export const SPECIAL_PIECES = [
+  ...VALID_PIECES,
+  piece('clear-diamond', 0, 8, 0),
+  piece('black-body', 0, 8, 7),
+];
+
 describe('validation du placement', () => {
   it('accepte une mine complète valide', () => {
     const result = validateMine(mineOf(VALID_PIECES));
@@ -28,6 +34,18 @@ describe('validation du placement', () => {
 
   it('refuse une mine incomplète', () => {
     const result = validateMine(mineOf(VALID_PIECES.slice(0, 4)));
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((error) => error.code === 'invalid-piece-count')).toBe(true);
+  });
+
+  it('accepte une mine spéciale de sept gemmes', () => {
+    const result = validateMine(mineOf(SPECIAL_PIECES), { mode: 'special' });
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('refuse les gemmes spéciales en mode de base', () => {
+    const result = validateMine(mineOf(SPECIAL_PIECES));
     expect(result.ok).toBe(false);
     expect(result.errors.some((error) => error.code === 'invalid-piece-count')).toBe(true);
   });
