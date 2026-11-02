@@ -3,6 +3,7 @@ import { polygonArea, boundingBox } from './geometry';
 import {
   BASE_PIECE_KINDS,
   PIECE_DEFINITIONS,
+  canFlip,
   canonicalRotation,
   colorForKind,
   createPiece,
@@ -98,6 +99,19 @@ describe('pieces', () => {
       }
     },
   );
+
+  it('retourne le parallélogramme rouge en miroir', () => {
+    expect(canFlip('red-parallelogram')).toBe(true);
+    expect(canFlip('white-diamond')).toBe(false);
+
+    const normal = shapeFor('red-parallelogram', 0);
+    const mirrored = shapeFor('red-parallelogram', 0, true);
+    expect(mirrored).not.toEqual(normal);
+    expect(polygonArea(mirrored)).toBeCloseTo(polygonArea(normal), 9);
+    expect(boundingBox(mirrored)).toMatchObject({ width: 3, height: 1 });
+    expect(canonicalRotation('red-parallelogram', 2, true)).toBe(0);
+    expect(canonicalRotation('red-parallelogram', 3, true)).toBe(1);
+  });
 
   it('place une pièce sur la grille à partir de son ancre', () => {
     const piece = createPiece('white-diamond', 0, 4, 3);

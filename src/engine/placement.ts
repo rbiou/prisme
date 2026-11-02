@@ -1,6 +1,7 @@
 import { BOARD_HEIGHT, BOARD_WIDTH } from './board';
 import { boundingBox, polygonsEqual, polygonsOverlap, sharedBoundaryLength } from './geometry';
 import {
+  canFlip,
   colorForKind,
   isPieceKind,
   isRotation,
@@ -54,6 +55,20 @@ function geometryErrors(piece: PlacedPiece): ValidationError[] {
     errors.push({
       code: 'invalid-piece-kind',
       message: `L'identifiant de la pièce doit correspondre à son type (${piece.kind}).`,
+      pieceId: piece.id,
+    });
+  }
+  if (piece.flipped !== undefined && typeof piece.flipped !== 'boolean') {
+    errors.push({
+      code: 'invalid-flip',
+      message: `Le retournement de ${piece.kind} doit être un booléen.`,
+      pieceId: piece.id,
+    });
+  }
+  if (piece.flipped === true && !canFlip(piece.kind)) {
+    errors.push({
+      code: 'invalid-flip',
+      message: `Seul le parallélogramme rouge peut être retourné.`,
       pieceId: piece.id,
     });
   }

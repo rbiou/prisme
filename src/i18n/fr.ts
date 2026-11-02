@@ -13,6 +13,7 @@ export const fr = {
     loading: 'Un instant…',
     remove: 'Retirer',
     rotate: 'Tourner',
+    flip: 'Retourner',
     home: 'Accueil',
     rules: 'Règles',
     settings: 'Réglages',

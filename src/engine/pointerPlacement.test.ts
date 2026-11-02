@@ -63,18 +63,30 @@ describe('pointerPlacement — accroche', () => {
 
   it('renvoie la cible quand aucun rayon de recherche ne convient', () => {
     const mine = mineWith(createPiece('red-parallelogram', 0, 0, 0));
-    expect(nearestValidOrigin(mine, 'yellow-triangle', 0, { x: 0, y: 0 }, 0)).toEqual({
+    expect(nearestValidOrigin(mine, 'yellow-triangle', 0, { x: 0, y: 0 }, false, 0)).toEqual({
       x: 0,
       y: 0,
     });
   });
 
-  it('liste les cases couvertes par la boîte de la gemme', () => {
+  it('liste les cases réellement recouvertes par la gemme', () => {
     const cells = cellsTouchedByPiece(createPiece('red-parallelogram', 0, 0, 0));
     expect(cells).toEqual([
       { col: 0, row: 0 },
       { col: 1, row: 0 },
       { col: 2, row: 0 },
     ]);
+  });
+
+  it('ignore les cases libres de la boîte englobante d’un triangle', () => {
+    const triangle = cellsTouchedByPiece(createPiece('yellow-triangle', 0, 0, 0));
+    expect(triangle).not.toContainEqual({ col: 1, row: 1 });
+    expect(triangle).toEqual(
+      expect.arrayContaining([
+        { col: 0, row: 0 },
+        { col: 1, row: 0 },
+        { col: 0, row: 1 },
+      ]),
+    );
   });
 });

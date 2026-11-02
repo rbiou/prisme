@@ -137,6 +137,7 @@ interface PlacedPiece {
   kind: PieceKind;
   color: GemColor | null; // null pour le Diamant et le Corps noir
   rotation: Rotation;
+  flipped?: boolean; // miroir vertical, réservé au parallélogramme rouge
   x: number;
   y: number;
 }
@@ -201,6 +202,7 @@ renvoie `status: 'absorbed'` sans point de sortie.
 
 - composition exacte des cinq pièces de base ou des sept pièces spéciales ;
 - rotation valide et sommets entiers ;
+- retournement en miroir accepté pour le seul parallélogramme rouge ;
 - pièce contenue dans le plateau ;
 - pas de chevauchement ;
 - pas de contact bord à bord ;
@@ -365,7 +367,7 @@ navigation suit la session : accueil → salon → placement → partie.
 ### 7.3 Protocole
 
 Voir `docs/PROTOCOL.md`. Les messages sont des objets JSON avec un champ `type`
-et `protocol: 4`. Ils sont validés par des guards avant application. Les
+et `protocol: 5`. Ils sont validés par des guards avant application. Les
 messages inconnus ou mal formés sont ignorés. Le message `sync` transporte
 l'état public, son mode et les révélations déjà reçues, jamais la mine secrète.
 

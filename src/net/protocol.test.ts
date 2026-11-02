@@ -343,6 +343,45 @@ describe('protocole réseau', () => {
     ).toBeNull();
   });
 
+  it('accepte le retournement du seul parallélogramme rouge', () => {
+    const flipped: SerializedMine = {
+      version: 1,
+      pieces: CANDIDATE.pieces.map((piece) =>
+        piece.kind === 'red-parallelogram' ? { ...piece, flipped: true } : piece,
+      ),
+    };
+    const submit = {
+      protocol: PROTOCOL_VERSION,
+      type: 'submit',
+      id: 's-flip',
+      from: 'host',
+      candidate: flipped,
+    };
+    expect(parse(submit)).toEqual(submit);
+    expect(
+      parse({
+        ...submit,
+        candidate: {
+          ...flipped,
+          pieces: flipped.pieces.map((piece) =>
+            piece.kind === 'white-diamond' ? { ...piece, flipped: true } : piece,
+          ),
+        },
+      }),
+    ).toBeNull();
+    expect(
+      parse({
+        ...submit,
+        candidate: {
+          ...flipped,
+          pieces: flipped.pieces.map((piece) =>
+            piece.kind === 'red-parallelogram' ? { ...piece, flipped: 'oui' } : piece,
+          ),
+        },
+      }),
+    ).toBeNull();
+  });
+
   it('accepte une proposition complète et un résultat', () => {
     const submit = {
       protocol: PROTOCOL_VERSION,

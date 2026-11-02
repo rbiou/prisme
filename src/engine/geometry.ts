@@ -94,6 +94,14 @@ export function translatePolygon(points: Point[], dx: number, dy: number): Point
   return points.map((point) => ({ x: point.x + dx, y: point.y + dy }));
 }
 
+/** Effet miroir autour de l’axe vertical médian de la boîte englobante. */
+export function mirrorPolygon(points: Point[]): Point[] {
+  const box = boundingBox(points);
+  return normalizePolygon(
+    points.map((point) => ({ x: box.minX + box.maxX - point.x, y: point.y })),
+  );
+}
+
 /** Rotation de 90° dans le sens horaire autour de l'origine. */
 export function rotatePoint90Clockwise(point: Point): Point {
   return { x: point.y, y: -point.x };

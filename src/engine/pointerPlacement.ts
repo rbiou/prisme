@@ -1,5 +1,13 @@
 import { BOARD_HEIGHT, BOARD_WIDTH } from './board';
-import { boundingBox, polygonsOverlap, sharedBoundaryLength, type BBox } from './geometry';
+import {
+  AREA_EPS,
+  boundingBox,
+  cellPolygon,
+  polygonIntersectionArea,
+  polygonsOverlap,
+  sharedBoundaryLength,
+  type BBox,
+} from './geometry';
 import { createPiece, piecePolygon, shapeFor } from './pieces';
 import type { Cell, Mine, PieceKind, PlacedPiece, Point, Rotation } from './types';
 
@@ -76,11 +84,12 @@ export function nearestValidOrigin(
   kind: PieceKind,
   rotation: Rotation,
   desired: PieceOrigin,
+  flipped = false,
   maxRadius = 3,
 ): PieceOrigin {
   const base = clampOrigin(kind, rotation, desired.x, desired.y);
   const fits = (origin: PieceOrigin) =>
-    canPlacePiece(mine, createPiece(kind, rotation, origin.x, origin.y));
+    canPlacePiece(mine, createPiece(kind, rotation, origin.x, origin.y, flipped));
   if (fits(base)) return base;
 
   const candidates: Array<PieceOrigin & { distance: number }> = [];
@@ -102,9 +111,10 @@ export function nearestValidOrigin(
   return base;
 }
 
-/** Cases recouvertes par la boîte englobante d’une gemme. */
+/** Cases réellement recouvertes par le polygone d’une gemme. */
 export function cellsTouchedByPiece(piece: PlacedPiece): Cell[] {
-  const box = boundingBox(piecePolygon(piece));
+  const polygon = piecePolygon(piece);
+  const box = boundingBox(polygon);
   const cells: Cell[] = [];
   const minCol = Math.max(0, Math.floor(box.minX));
   const maxCol = Math.min(BOARD_WIDTH - 1, Math.ceil(box.maxX) - 1);
@@ -112,7 +122,10 @@ export function cellsTouchedByPiece(piece: PlacedPiece): Cell[] {
   const maxRow = Math.min(BOARD_HEIGHT - 1, Math.ceil(box.maxY) - 1);
   for (let row = minRow; row <= maxRow; row += 1) {
     for (let col = minCol; col <= maxCol; col += 1) {
-      cells.push({ col, row });
+      const cell = { col, row };
+      if (polygonIntersectionArea(polygon, cellPolygon(cell)) > AREA_EPS) {
+        cells.push(cell);
+      }
     }
   }
   return cells;

@@ -65,9 +65,10 @@ intersections de la grille.
 | Diamant          | triangle isocèle, base = 2, hauteur = 1                | 2 × 1            | 1 case  |
 | Corps noir       | rectangle 2 × 1                                        | 2 × 1            | 2 cases |
 
-Les pièces peuvent être tournées par pas de **90°**. Elles ne peuvent pas être
-retournées. Le parallélogramme rouge est chiral dans le plan : le retourner
-donnerait une orientation impossible à obtenir par rotation.
+Les pièces peuvent être tournées par pas de **90°**. Seul le **parallélogramme
+rouge** peut aussi être **retourné en miroir**, sans changer son pas de rotation :
+c'est la seule pièce chirale du jeu. Les autres gemmes se transforment en elles-mêmes
+par simple rotation et n'ont pas besoin de ce retournement.
 
 ## 4 bis. Gemmes spéciales
 

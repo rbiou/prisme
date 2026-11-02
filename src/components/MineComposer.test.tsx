@@ -129,7 +129,47 @@ describe('MineComposer — placement fluide des gemmes', () => {
   });
 });
 
+describe('MineComposer — retournement du parallélogramme', () => {
+  it('réserve le bouton Retourner au parallélogramme rouge', () => {
+    render(<MineComposer mine={EMPTY_MINE} onChange={vi.fn()} />);
+
+    expect(screen.getByRole('button', { name: 'Retourner' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Losange blanc/ }));
+    expect(screen.queryByRole('button', { name: 'Retourner' })).toBeNull();
+  });
+
+  it('place le parallélogramme rouge retourné', () => {
+    const onChange = vi.fn();
+    render(<MineComposer mine={EMPTY_MINE} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retourner' }));
+    const cell = boardCells()[2 * 10 + 4] as Element;
+    fireEvent.pointerDown(cell, { pointerId: 1 });
+    fireEvent.pointerUp(cell, { pointerId: 1 });
+
+    const next = onChange.mock.calls[0]?.[0] as Mine;
+    expect(next.pieces[0]).toMatchObject({ kind: 'red-parallelogram', flipped: true });
+  });
+});
+
 describe('MineComposer — croix des notes privées', () => {
+  it('ajoute une croix dans une case libre voisine de la boîte d’un triangle', () => {
+    const onCrossesChange = vi.fn();
+    render(
+      <MineComposer
+        mine={{ version: 1, pieces: [createPiece('yellow-triangle', 0, 0, 0)] }}
+        onChange={vi.fn()}
+        crosses={[]}
+        onCrossesChange={onCrossesChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Croix' }));
+    fireEvent.click(boardCells()[1 * 10 + 1] as Element);
+
+    expect(onCrossesChange).toHaveBeenCalledWith([{ col: 1, row: 1 }]);
+  });
+
   it('ajoute une croix dans la case touchée en mode croix', () => {
     const { onChange, onCrossesChange } = renderComposer();
 

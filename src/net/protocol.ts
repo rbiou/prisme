@@ -18,7 +18,7 @@ import type {
 } from '../engine/types';
 import { isHex, randomHex } from './integrity';
 
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 export const MAX_NAME_LENGTH = 40;
 export const MAX_ID_LENGTH = 64;
 

@@ -2256,6 +2256,10 @@ input[type='checkbox'] {
   gap: 18px;
 }
 
+.result-pairing {
+  margin: 0 0 12px;
+}
+
 .result-mine {
   min-width: 0;
 }
@@ -2270,16 +2274,6 @@ input[type='checkbox'] {
 
 .result-notes h3 {
   margin: 0;
-}
-
-.reasoning-proposal {
-  margin-top: 12px;
-}
-
-.reasoning-proposal summary {
-  color: var(--muted);
-  font-size: 0.82rem;
-  cursor: pointer;
 }
 
 .hash-line {

@@ -2,6 +2,7 @@ import { BOARD_HEIGHT, BOARD_WIDTH, isCell } from './board';
 import { polygonsEqual } from './geometry';
 import {
   ALL_PIECE_KINDS,
+  canFlip,
   canonicalRotation,
   colorForKind,
   isPieceKind,
@@ -55,9 +56,10 @@ export function isCompleteMine(mine: Mine, mode: GameMode = 'base'): boolean {
 export function serializeMine(mine: Mine): SerializedMine {
   const pieces: SerializedPiece[] = sortMinePieces(mine.pieces).map((piece) => ({
     kind: piece.kind,
-    rotation: canonicalRotation(piece.kind, piece.rotation),
+    rotation: canonicalRotation(piece.kind, piece.rotation, piece.flipped === true),
     x: piece.x,
     y: piece.y,
+    ...(piece.flipped ? { flipped: true } : {}),
   }));
   return { version: 1, pieces };
 }
@@ -80,6 +82,10 @@ function isSerializedPieceValue(value: unknown, seen: Set<PieceKind>): boolean {
     piece.y >= BOARD_HEIGHT
   ) {
     return false;
+  }
+  if (piece.flipped !== undefined) {
+    if (typeof piece.flipped !== 'boolean') return false;
+    if (piece.flipped && !canFlip(piece.kind)) return false;
   }
   if (seen.has(piece.kind)) return false;
   seen.add(piece.kind);
@@ -125,9 +131,10 @@ export function isSerializedNote(value: unknown): value is SerializedNote {
 export function serializeNote(mine: Mine): SerializedNote {
   const pieces: SerializedPiece[] = sortMinePieces(mine.pieces).map((piece) => ({
     kind: piece.kind,
-    rotation: canonicalRotation(piece.kind, piece.rotation),
+    rotation: canonicalRotation(piece.kind, piece.rotation, piece.flipped === true),
     x: piece.x,
     y: piece.y,
+    ...(piece.flipped ? { flipped: true } : {}),
   }));
   return { version: 1, pieces };
 }
@@ -141,6 +148,7 @@ export function deserializeNote(note: SerializedNote): Mine {
         kind: piece.kind,
         color: colorForKind(piece.kind),
         rotation: piece.rotation,
+        flipped: piece.flipped === true ? true : undefined,
         x: piece.x,
         y: piece.y,
       })),
@@ -161,6 +169,7 @@ export function canonicalMineJson(mine: Mine): string {
       rotation: piece.rotation,
       x: piece.x,
       y: piece.y,
+      ...(piece.flipped ? { flipped: true } : {}),
     })),
   });
 }

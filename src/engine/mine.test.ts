@@ -63,6 +63,30 @@ describe('sérialisation et comparaison de mine', () => {
     expect(isCompleteMine(restored)).toBe(true);
   });
 
+  it('conserve le retournement du parallélogramme rouge', () => {
+    const flipped: Mine = {
+      version: 1,
+      pieces: validMine().pieces.map((piece) =>
+        piece.kind === 'red-parallelogram' ? { ...piece, flipped: true } : piece,
+      ),
+    };
+    const serialized = serializeMine(flipped);
+    expect(serialized.pieces[0]).toMatchObject({ kind: 'red-parallelogram', flipped: true });
+    expect(deserializeMine(serialized).pieces[0]?.flipped).toBe(true);
+    expect(canonicalMineJson(flipped)).not.toBe(canonicalMineJson(validMine()));
+    expect(mineEquals(flipped, validMine())).toBe(false);
+  });
+
+  it('refuse un retournement sur une gemme non chirale', () => {
+    const invalid = {
+      version: 1,
+      pieces: serializeMine(validMine()).pieces.map((piece) =>
+        piece.kind === 'white-diamond' ? { ...piece, flipped: true } : piece,
+      ),
+    };
+    expect(isSerializedMine(invalid)).toBe(false);
+  });
+
   it('compare les polygones et non les rotations brutes', () => {
     const a = validMine();
     const b = deserializeMine({

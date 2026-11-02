@@ -206,6 +206,10 @@ export function ResultScreen({
         </div>
       </section>
 
+      <p className="hint result-pairing">
+        Chaque proposition est placée à côté de la mine qu’elle cherchait à reconstituer.
+      </p>
+
       <div className="result-mines">
         <section className="card card--plain result-mine">
           <div className="panel-heading">
@@ -224,6 +228,34 @@ export function ResultScreen({
             <span>SHA-256</span>
             <code>{myHash}</code>
           </p>
+        </section>
+
+        <section className="card card--plain result-mine">
+          <div className="panel-heading">
+            <div>
+              <p className="kicker">Proposition adverse</p>
+              <h2>Proposition de {opponentName}</h2>
+            </div>
+            {remoteSubmission ? (
+              <span
+                className={`badge ${remoteSubmission.correct ? 'badge--success' : 'badge--danger'}`}
+              >
+                {remoteSubmission.correct ? 'Correcte' : 'Incorrecte'}
+              </span>
+            ) : (
+              <span className="badge badge--soft">Aucune</span>
+            )}
+          </div>
+          {remoteSubmission ? (
+            <div className="board-frame board-frame--compact">
+              <Board
+                mine={deserializeMine(remoteSubmission.candidate)}
+                ariaLabel={`Proposition de ${opponentName} sur votre mine`}
+              />
+            </div>
+          ) : (
+            <p className="empty-state">Aucune proposition soumise.</p>
+          )}
         </section>
 
         <section className="card card--plain result-mine">
@@ -277,13 +309,41 @@ export function ResultScreen({
             </div>
           )}
         </section>
+
+        <section className="card card--plain result-mine">
+          <div className="panel-heading">
+            <div>
+              <p className="kicker">Votre proposition</p>
+              <h2>Votre proposition</h2>
+            </div>
+            {mySubmission ? (
+              <span
+                className={`badge ${mySubmission.correct ? 'badge--success' : 'badge--danger'}`}
+              >
+                {mySubmission.correct ? 'Correcte' : 'Incorrecte'}
+              </span>
+            ) : (
+              <span className="badge badge--soft">Aucune</span>
+            )}
+          </div>
+          {mySubmission ? (
+            <div className="board-frame board-frame--compact">
+              <Board
+                mine={deserializeMine(mySubmission.candidate)}
+                ariaLabel={`Votre proposition sur la mine de ${opponentName}`}
+              />
+            </div>
+          ) : (
+            <p className="empty-state">Aucune proposition soumise.</p>
+          )}
+        </section>
       </div>
 
       <section className="result-reasoning">
         <div className="panel-heading">
           <div>
             <p className="kicker">Après la partie</p>
-            <h2>Notes finales et propositions</h2>
+            <h2>Notes finales</h2>
           </div>
         </div>
         <div className="result-mines result-notes">
@@ -313,21 +373,6 @@ export function ResultScreen({
               </div>
             ) : (
               <p className="empty-state">Aucune note conservée.</p>
-            )}
-            {mySubmission ? (
-              <details className="reasoning-proposal">
-                <summary>
-                  Proposition soumise — {mySubmission.correct ? 'correcte' : 'incorrecte'}
-                </summary>
-                <div className="board-frame board-frame--compact">
-                  <Board
-                    mine={deserializeMine(mySubmission.candidate)}
-                    ariaLabel="Votre proposition soumise"
-                  />
-                </div>
-              </details>
-            ) : (
-              <p className="hint">Aucune proposition soumise.</p>
             )}
           </article>
 
@@ -365,22 +410,6 @@ export function ResultScreen({
               )
             ) : (
               <p className="empty-state">{fr.result.revealPending}</p>
-            )}
-            {remoteSubmission ? (
-              <details className="reasoning-proposal">
-                <summary>
-                  Proposition de {opponentName} —{' '}
-                  {remoteSubmission.correct ? 'correcte' : 'incorrecte'}
-                </summary>
-                <div className="board-frame board-frame--compact">
-                  <Board
-                    mine={deserializeMine(remoteSubmission.candidate)}
-                    ariaLabel={`Proposition de ${opponentName}`}
-                  />
-                </div>
-              </details>
-            ) : (
-              <p className="hint">Aucune proposition soumise.</p>
             )}
           </article>
         </div>

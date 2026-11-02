@@ -1,4 +1,4 @@
-import { polygonKey, rotatePolygon, translatePolygon } from './geometry';
+import { mirrorPolygon, polygonKey, rotatePolygon, translatePolygon } from './geometry';
 import type {
   GameMode,
   GemColor,
@@ -15,6 +15,8 @@ export interface PieceDefinition {
   label: string;
   base: Point[];
   rotations: Point[][];
+  /** Rotations du miroir vertical, pour les pièces chirales. */
+  flippedRotations: Point[][];
 }
 
 const BASE_SHAPES: Record<PieceKind, { color: GemColor | null; label: string; points: Point[] }> = {
@@ -116,10 +118,17 @@ export function isSpecialPieceKind(value: string): value is SpecialPieceKind {
   return (SPECIAL_PIECE_KINDS as readonly string[]).includes(value);
 }
 
+/** Seul le parallélogramme rouge est chiral : il peut être retourné en miroir. */
+export function canFlip(kind: PieceKind): boolean {
+  return kind === 'red-parallelogram';
+}
+
 export const PIECE_DEFINITIONS: Record<PieceKind, PieceDefinition> = Object.fromEntries(
   PIECE_ORDER.map((kind) => {
     const shape = BASE_SHAPES[kind];
     const rotations = [0, 1, 2, 3].map((rotation) => rotatePolygon(shape.points, rotation));
+    const mirrored = mirrorPolygon(shape.points);
+    const flippedRotations = [0, 1, 2, 3].map((rotation) => rotatePolygon(mirrored, rotation));
     return [
       kind,
       {
@@ -128,6 +137,7 @@ export const PIECE_DEFINITIONS: Record<PieceKind, PieceDefinition> = Object.from
         label: shape.label,
         base: shape.points,
         rotations,
+        flippedRotations,
       },
     ];
   }),
@@ -149,8 +159,10 @@ export function labelForKind(kind: PieceKind): string {
   return PIECE_DEFINITIONS[kind].label;
 }
 
-export function shapeFor(kind: PieceKind, rotation: Rotation): Point[] {
-  return PIECE_DEFINITIONS[kind].rotations[rotation];
+export function shapeFor(kind: PieceKind, rotation: Rotation, flipped = false): Point[] {
+  const shape = PIECE_DEFINITIONS[kind];
+  const rotations = flipped && canFlip(kind) ? shape.flippedRotations : shape.rotations;
+  return rotations[rotation];
 }
 
 export function createPiece(
@@ -158,19 +170,21 @@ export function createPiece(
   rotation: Rotation,
   x: number,
   y: number,
+  flipped = false,
 ): PlacedPiece {
   return {
     id: kind,
     kind,
     color: colorForKind(kind),
     rotation,
+    flipped: flipped && canFlip(kind) ? true : undefined,
     x,
     y,
   };
 }
 
 export function piecePolygon(piece: PlacedPiece): Point[] {
-  const shape = shapeFor(piece.kind, piece.rotation);
+  const shape = shapeFor(piece.kind, piece.rotation, piece.flipped === true);
   return translatePolygon(shape, piece.x, piece.y);
 }
 
@@ -194,9 +208,10 @@ export function pieceBoundingBox(piece: PlacedPiece) {
  * losange et rectangle). On normalise vers la plus petite rotation équivalente
  * pour que l’engagement et la comparaison de solution soient stables.
  */
-export function canonicalRotation(kind: PieceKind, rotation: Rotation): Rotation {
-  const target = polygonKey(shapeFor(kind, rotation));
-  const rotations = PIECE_DEFINITIONS[kind].rotations;
+export function canonicalRotation(kind: PieceKind, rotation: Rotation, flipped = false): Rotation {
+  const target = polygonKey(shapeFor(kind, rotation, flipped));
+  const shape = PIECE_DEFINITIONS[kind];
+  const rotations = flipped && canFlip(kind) ? shape.flippedRotations : shape.rotations;
   for (let candidate = 0; candidate < 4; candidate += 1) {
     const polygon = rotations[candidate];
     if (polygon && polygonKey(polygon) === target) {
@@ -209,6 +224,6 @@ export function canonicalRotation(kind: PieceKind, rotation: Rotation): Rotation
 export function normalizePiece(piece: PlacedPiece): PlacedPiece {
   return {
     ...piece,
-    rotation: canonicalRotation(piece.kind, piece.rotation),
+    rotation: canonicalRotation(piece.kind, piece.rotation, piece.flipped === true),
   };
 }

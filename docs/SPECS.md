@@ -92,7 +92,9 @@ un fantôme vert indique une position valide et un fantôme rouge une position
 occupée ou en contact bord à bord ; la gemme est ramenée dans le plateau et se
 cale sur la position valide la plus proche lorsqu'elle existe. La rotation, la
 suppression et la saisie de coordonnées restent disponibles pour le clavier et
-les ajustements fins.
+les ajustements fins. Le parallélogramme rouge dispose en plus d'un bouton
+**Retourner** qui applique un effet miroir, sans changer son pas de rotation :
+c'est la seule gemme chirale.
 
 ### 5.5 Partie
 
@@ -204,10 +206,11 @@ comme dans les règles (rouge + bleu + jaune + blanc = gris, par exemple).
 ### 5.7 Fin de partie
 
 - Écran de résultat : victoire, défaite ou égalité, avec la raison.
-- Révélation des deux mines côte à côte (empilées sur mobile).
-- Section **Notes finales et propositions** : les notes de chaque joueur avec
-  leurs croix, arêtes et ronds, puis, en dépliant, la proposition soumise et son
-  verdict.
+- Deux lignes de comparaison : la mine d'un joueur révélée à côté de la
+  proposition de l'adversaire qui devait la reconstituer (puis l'inverse sur la
+  deuxième ligne).
+- Section **Notes finales** : les notes de chaque joueur avec leurs croix, arêtes
+  et ronds, séparées des propositions.
 - Vérification de l'engagement SHA-256 et, sur demande, rejeu des réponses.
 - Boutons **Rejouer** (si la connexion est encore active) et **Accueil**.
 - En cas de doute sur l'intégrité, un avertissement explicite est affiché.

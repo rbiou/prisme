@@ -3,8 +3,8 @@ import { createPiece } from './pieces';
 import { validateMine, validatePartialMine, validatePieces } from './placement';
 import type { Mine, PieceKind, Rotation } from './types';
 
-function piece(kind: PieceKind, rotation: Rotation, x: number, y: number) {
-  return createPiece(kind, rotation, x, y);
+function piece(kind: PieceKind, rotation: Rotation, x: number, y: number, flipped = false) {
+  return createPiece(kind, rotation, x, y, flipped);
 }
 
 function mineOf(pieces: ReturnType<typeof piece>[]): Mine {
@@ -90,6 +90,20 @@ describe('validation du placement', () => {
     ]);
     expect(result.errors.some((error) => error.code === 'edge-contact')).toBe(false);
     expect(result.errors.some((error) => error.code === 'overlap')).toBe(false);
+  });
+
+  it('accepte le parallélogramme rouge retourné', () => {
+    const result = validatePieces([piece('red-parallelogram', 0, 1, 1, true)], {
+      requireAll: false,
+    });
+    expect(result.errors.some((error) => error.code === 'invalid-flip')).toBe(false);
+  });
+
+  it('refuse un retournement sur une autre gemme', () => {
+    const result = validatePieces([{ ...piece('white-diamond', 0, 4, 3), flipped: true }], {
+      requireAll: false,
+    });
+    expect(result.errors.some((error) => error.code === 'invalid-flip')).toBe(true);
   });
 
   it('refuse une gemme invisible pour tous les rayons', () => {

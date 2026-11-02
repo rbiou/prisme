@@ -105,8 +105,9 @@ export function RulesScreen({ onBack }: { onBack: () => void }) {
             <li>Une disposition qui produit une boucle de rayon est refusée.</li>
           </ol>
           <p>
-            Les gemmes tournent uniquement par pas de 90°. Elles ne se retournent jamais : le
-            parallélogramme rouge est chiral.
+            Les gemmes tournent uniquement par pas de 90°. Le parallélogramme rouge est la seule
+            gemme chirale : il peut en plus être retourné en miroir, avec le bouton{' '}
+            <strong>Retourner</strong>, sans changer son pas de rotation.
           </p>
           <details>
             <summary>Règle optionnelle : symétrie des gemmes blanches</summary>

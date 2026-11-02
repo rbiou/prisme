@@ -45,6 +45,8 @@ export interface PlacedPiece {
   /** `null` pour le diamant et le corps noir. */
   color: GemColor | null;
   rotation: Rotation;
+  /** Miroir vertical, réservé au parallélogramme rouge. */
+  flipped?: boolean;
   x: number;
   y: number;
 }
@@ -59,6 +61,8 @@ export interface SerializedPiece {
   rotation: Rotation;
   x: number;
   y: number;
+  /** Absent vaut `false`. */
+  flipped?: boolean;
 }
 
 export interface SerializedMine {
@@ -114,6 +118,7 @@ export type ValidationErrorCode =
   | 'invalid-piece-kind'
   | 'duplicate-piece'
   | 'invalid-rotation'
+  | 'invalid-flip'
   | 'not-on-grid'
   | 'out-of-bounds'
   | 'overlap'

@@ -13,6 +13,7 @@ import {
 } from '../engine/colors';
 import { upsertNoteEdge, type CellEdgeSide, type NoteEdgeMark } from '../engine/noteEdges';
 import {
+  canFlip,
   colorForKind,
   createPiece,
   isSpecialPieceKind,
@@ -63,13 +64,15 @@ const EDGE_SIDE_OPTIONS: Array<{ value: CellEdgeSide; label: string; name: strin
 export function GemPreview({
   kind,
   rotation = 0,
+  flipped = false,
   className,
 }: {
   kind: PieceKind;
   rotation?: Rotation;
+  flipped?: boolean;
   className?: string;
 }) {
-  const shape = shapeFor(kind, rotation);
+  const shape = shapeFor(kind, rotation, flipped);
   const maxX = Math.max(...shape.map((point) => point.x));
   const maxY = Math.max(...shape.map((point) => point.y));
   const color = colorForKind(kind);
@@ -109,6 +112,7 @@ export type NoteTool = 'scan' | 'piece' | 'cross' | 'edge' | 'dot';
 interface DragState {
   kind: PieceKind;
   rotation: Rotation;
+  flipped: boolean;
   origin: 'new' | 'existing';
   start: Point;
   anchor: PieceOrigin;
@@ -173,6 +177,7 @@ export function MineComposer({
 }: MineComposerProps) {
   const [internalKind, setInternalKind] = useState<PieceKind>('red-parallelogram');
   const [rotation, setRotation] = useState<Rotation>(0);
+  const [flipped, setFlipped] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [coordinate, setCoordinate] = useState('');
   const [internalTool, setInternalTool] = useState<NoteTool>(onScanCell ? 'scan' : 'piece');
@@ -204,6 +209,7 @@ export function MineComposer({
     onSelectedKindChange?.(kind);
     const existing = mine.pieces.find((piece) => piece.kind === kind);
     setRotation(existing?.rotation ?? 0);
+    setFlipped(existing?.flipped === true);
     setMessage(null);
   }
 
@@ -246,8 +252,8 @@ export function MineComposer({
       x: cell.col + 0.5,
       y: cell.row + 0.5,
     });
-    const anchor = nearestValidOrigin(mine, activeKind, rotation, desired);
-    commitPiece(createPiece(activeKind, rotation, anchor.x, anchor.y));
+    const anchor = nearestValidOrigin(mine, activeKind, rotation, desired, flipped);
+    commitPiece(createPiece(activeKind, rotation, anchor.x, anchor.y, flipped));
   }
 
   function beginNewDrag(point: Point) {
@@ -256,11 +262,13 @@ export function MineComposer({
       activeKind,
       rotation,
       originForPoint(activeKind, rotation, point),
+      flipped,
     );
     setHover(null);
     setDrag({
       kind: activeKind,
       rotation,
+      flipped,
       origin: 'new',
       start: point,
       anchor,
@@ -275,6 +283,7 @@ export function MineComposer({
     setDrag({
       kind: piece.kind,
       rotation: piece.rotation,
+      flipped: piece.flipped === true,
       origin: 'existing',
       start: point,
       anchor: { x: piece.x, y: piece.y },
@@ -311,7 +320,7 @@ export function MineComposer({
               point.x + drag.grabOffset.x,
               point.y + drag.grabOffset.y,
             );
-      const anchor = nearestValidOrigin(mine, drag.kind, drag.rotation, desired);
+      const anchor = nearestValidOrigin(mine, drag.kind, drag.rotation, desired, drag.flipped);
       const moved = drag.moved || Math.hypot(point.x - drag.start.x, point.y - drag.start.y) > 0.08;
       if (anchor.x !== drag.anchor.x || anchor.y !== drag.anchor.y || moved !== drag.moved) {
         setDrag({ ...drag, anchor, moved });
@@ -324,7 +333,13 @@ export function MineComposer({
         return;
       }
       setHover(
-        nearestValidOrigin(mine, activeKind, rotation, originForPoint(activeKind, rotation, point)),
+        nearestValidOrigin(
+          mine,
+          activeKind,
+          rotation,
+          originForPoint(activeKind, rotation, point),
+          flipped,
+        ),
       );
     }
   }
@@ -336,7 +351,15 @@ export function MineComposer({
     setHover(null);
     if (!cell) return;
     if (current.origin === 'existing' && !current.moved) return;
-    commitPiece(createPiece(current.kind, current.rotation, current.anchor.x, current.anchor.y));
+    commitPiece(
+      createPiece(
+        current.kind,
+        current.rotation,
+        current.anchor.x,
+        current.anchor.y,
+        current.flipped,
+      ),
+    );
   }
 
   function handleCellPointerCancel() {
@@ -430,9 +453,9 @@ export function MineComposer({
       ? { version: 1, pieces: mine.pieces.filter((piece) => piece.kind !== drag.kind) }
       : mine;
   const ghostPiece = drag
-    ? createPiece(drag.kind, drag.rotation, drag.anchor.x, drag.anchor.y)
+    ? createPiece(drag.kind, drag.rotation, drag.anchor.x, drag.anchor.y, drag.flipped)
     : hover
-      ? createPiece(activeKind, rotation, hover.x, hover.y)
+      ? createPiece(activeKind, rotation, hover.x, hover.y, flipped)
       : null;
   const ghostValid = ghostPiece ? canPlacePiece(mine, ghostPiece) : true;
 
@@ -442,6 +465,15 @@ export function MineComposer({
     setRotation(next);
     if (placed) {
       onChange(upsertPiece(mine, { ...placed, rotation: next }));
+    }
+  }
+
+  function flip() {
+    if (disabled || !canFlip(activeKind)) return;
+    const next = !flipped;
+    setFlipped(next);
+    if (placed) {
+      onChange(upsertPiece(mine, { ...placed, flipped: next ? true : undefined }));
     }
   }
 
@@ -458,6 +490,7 @@ export function MineComposer({
     onEdgeMarksChange?.([]);
     onColorMarksChange?.([]);
     setRotation(0);
+    setFlipped(false);
     setMessage(null);
   }
 
@@ -485,7 +518,11 @@ export function MineComposer({
               disabled={disabled}
               aria-pressed={activeKind === kind}
             >
-              <GemPreview kind={kind} rotation={activeKind === kind ? rotation : 0} />
+              <GemPreview
+                kind={kind}
+                rotation={activeKind === kind ? rotation : 0}
+                flipped={activeKind === kind ? flipped : false}
+              />
               <span className="palette-label">{labelForKind(kind)}</span>
               <span className="palette-meta">{isPlaced ? 'placée' : kindColorLabel(kind)}</span>
             </button>
@@ -495,10 +532,17 @@ export function MineComposer({
 
       <div className="composer-toolbar">
         <div className="composer-selected">
-          <GemPreview kind={activeKind} rotation={rotation} className="gem-preview--small" />
+          <GemPreview
+            kind={activeKind}
+            rotation={rotation}
+            flipped={flipped}
+            className="gem-preview--small"
+          />
           <div>
             <strong>{labelForKind(activeKind)}</strong>
-            <span>Rotation {rotation * 90}°</span>
+            <span>
+              Rotation {rotation * 90}°{flipped ? ' · miroir' : ''}
+            </span>
           </div>
         </div>
         <div className="composer-actions">
@@ -510,6 +554,17 @@ export function MineComposer({
           >
             {fr.common.rotate}
           </button>
+          {canFlip(activeKind) ? (
+            <button
+              type="button"
+              className="btn btn--ghost btn--small"
+              onClick={flip}
+              disabled={disabled}
+              aria-pressed={flipped}
+            >
+              {fr.common.flip}
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn btn--ghost btn--small"
