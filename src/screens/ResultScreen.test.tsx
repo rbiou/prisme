@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createGame } from '../engine/endgame';
 import { serializeMine } from '../engine/mine';
 import { createPiece } from '../engine/pieces';
@@ -55,24 +55,31 @@ function endedGame(): GameState {
   };
 }
 
+function renderResult(options: { onNewGame?: () => void; onHome?: () => void } = {}) {
+  const onNewGame = options.onNewGame ?? vi.fn();
+  const onHome = options.onHome ?? vi.fn();
+  const utils = render(
+    <ResultScreen
+      role="host"
+      game={endedGame()}
+      myMine={MY_MINE}
+      myNotes={{ version: 1, pieces: [] }}
+      myMarks={{ crosses: [], edges: [], colors: [] }}
+      mySalt={'a'.repeat(32)}
+      myHash={'a'.repeat(64)}
+      opponentName="Alex"
+      opponentHash={'b'.repeat(64)}
+      reveals={{}}
+      onNewGame={onNewGame}
+      onHome={onHome}
+    />,
+  );
+  return { ...utils, onNewGame, onHome };
+}
+
 describe('ResultScreen — comparaison des mines et propositions', () => {
   it('place chaque proposition à côté de la mine qu’elle devait reconstituer', () => {
-    const { container } = render(
-      <ResultScreen
-        role="host"
-        game={endedGame()}
-        myMine={MY_MINE}
-        myNotes={{ version: 1, pieces: [] }}
-        myMarks={{ crosses: [], edges: [], colors: [] }}
-        mySalt={'a'.repeat(32)}
-        myHash={'a'.repeat(64)}
-        opponentName="Alex"
-        opponentHash={'b'.repeat(64)}
-        reveals={{}}
-        onNewGame={vi.fn()}
-        onHome={vi.fn()}
-      />,
-    );
+    const { container } = renderResult();
 
     const cards = Array.from(container.querySelectorAll('.result-mines > .result-mine'));
     const headings = cards.map((card) => card.querySelector('h2')?.textContent);
@@ -82,5 +89,23 @@ describe('ResultScreen — comparaison des mines et propositions', () => {
       'Mine de Alex',
       'Votre proposition',
     ]);
+  });
+
+  it('met Rejouer en avant comme action principale', () => {
+    const { onNewGame } = renderResult();
+
+    const replay = screen.getByRole('button', { name: 'Rejouer' });
+    expect(replay).toHaveClass('btn--primary');
+    expect(replay).toHaveClass('btn--replay');
+
+    fireEvent.click(replay);
+    expect(onNewGame).toHaveBeenCalledTimes(1);
+  });
+
+  it('propose aussi de revenir à l’accueil depuis le résultat', () => {
+    const { onHome } = renderResult();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Accueil' }));
+    expect(onHome).toHaveBeenCalledTimes(1);
   });
 });

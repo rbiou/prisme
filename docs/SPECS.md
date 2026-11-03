@@ -212,7 +212,9 @@ comme dans les règles (rouge + bleu + jaune + blanc = gris, par exemple).
 - Section **Notes finales** : les notes de chaque joueur avec leurs croix, arêtes
   et ronds, séparées des propositions.
 - Vérification de l'engagement SHA-256 et, sur demande, rejeu des réponses.
-- Boutons **Rejouer** (si la connexion est encore active) et **Accueil**.
+- Bouton **Rejouer** mis en avant comme action principale du résultat : il quitte
+  la partie et ramène à l'accueil pour en lancer une nouvelle, à côté d'un accès
+  discret à l'accueil.
 - En cas de doute sur l'intégrité, un avertissement explicite est affiché.
 
 ## 6. Exigences fonctionnelles

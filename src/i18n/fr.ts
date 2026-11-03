@@ -187,7 +187,7 @@ export const fr = {
     replayBad: 'Certaines réponses ne correspondent pas à la mine révélée.',
     replayPending: 'Vérification des réponses en cours…',
     revealPending: 'La mine adverse n’a pas encore été révélée.',
-    newGame: 'Nouvelle partie',
+    newGame: 'Rejouer',
     review: 'Revoir le plateau',
     warning:
       'Une incohérence a été détectée. Le résultat affiché est conservé, mais ne faites plus confiance à cette session.',

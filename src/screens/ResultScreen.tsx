@@ -204,6 +204,19 @@ export function ResultScreen({
           <span className="badge badge--soft">{game.scans.length} réponses</span>
           <span className="badge badge--soft">{game.submissions.length} proposition(s)</span>
         </div>
+        <div className="result-actions">
+          <button
+            type="button"
+            className="btn btn--primary btn--replay"
+            onClick={onNewGame}
+            autoFocus
+          >
+            {fr.result.newGame}
+          </button>
+          <button type="button" className="btn btn--ghost" onClick={onHome}>
+            {fr.common.home}
+          </button>
+        </div>
       </section>
 
       <p className="hint result-pairing">
@@ -526,12 +539,6 @@ export function ResultScreen({
             disabled={!remoteReveal}
           >
             Relancer la vérification
-          </button>
-          <button type="button" className="btn btn--ghost" onClick={onHome}>
-            {fr.common.home}
-          </button>
-          <button type="button" className="btn btn--primary" onClick={onNewGame}>
-            {fr.result.newGame}
           </button>
         </div>
       </section>
