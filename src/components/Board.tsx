@@ -41,7 +41,7 @@ const GEM_FILL: Record<GemColor, string> = {
 };
 
 const SPECIAL_FILL: Record<SpecialPieceKind, string> = {
-  'clear-diamond': '#f8fbff',
+  'clear-diamond': '#67e8f9',
   'black-body': SPECIAL_COLOR_SWATCHES['black-body'],
 };
 
@@ -233,9 +233,9 @@ function PatternDefs() {
         </pattern>
       ))}
       <radialGradient id="gem-clear-diamond" cx="38%" cy="32%" r="78%">
-        <stop offset="0%" stopColor="#ffffff" />
-        <stop offset="55%" stopColor="#f0f9ff" />
-        <stop offset="100%" stopColor="#bae6fd" />
+        <stop offset="0%" stopColor="#ecfeff" />
+        <stop offset="45%" stopColor="#a5f3fc" />
+        <stop offset="100%" stopColor="#22d3ee" />
       </radialGradient>
       <pattern
         id="gem-black-body"
@@ -486,7 +486,7 @@ export function Board({
             fill={patternFor(piece)}
             stroke={
               specialKindOf(piece) === 'clear-diamond'
-                ? '#7dd3fc'
+                ? '#22d3ee'
                 : piece.color === 'white'
                   ? '#f8fafc'
                   : '#0b1220'
@@ -500,7 +500,7 @@ export function Board({
             <polygon
               points={polygonPoints(piecePolygon(piece))}
               fill="none"
-              stroke="#e0f2fe"
+              stroke="#a5f3fc"
               strokeOpacity="0.55"
               strokeWidth="0.16"
               strokeLinejoin="round"

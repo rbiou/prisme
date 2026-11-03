@@ -36,7 +36,7 @@ export const GEM_COLOR_SWATCHES: Record<GemColor, string> = {
 };
 
 export const SPECIAL_COLOR_SWATCHES: Record<SpecialPieceKind, string> = {
-  'clear-diamond': '#e0f2fe',
+  'clear-diamond': '#22d3ee',
   'black-body': '#0b0b0f',
 };
 

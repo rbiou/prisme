@@ -77,7 +77,7 @@ export function GemPreview({
   const maxY = Math.max(...shape.map((point) => point.y));
   const color = colorForKind(kind);
   const fill = color ? GEM_FILL[color] : isSpecialPieceKind(kind) ? GEM_FILL[kind] : '#e2e8f0';
-  const stroke = kind === 'clear-diamond' ? '#7dd3fc' : '#0b1220';
+  const stroke = kind === 'clear-diamond' ? '#0e7490' : '#0b1220';
   return (
     <svg
       viewBox={`-0.25 -0.25 ${maxX + 0.5} ${maxY + 0.5}`}
@@ -97,8 +97,8 @@ export function GemPreview({
         <polygon
           points={shape.map((point) => `${point.x},${point.y}`).join(' ')}
           fill="none"
-          stroke="#e0f2fe"
-          strokeOpacity="0.6"
+          stroke="#a5f3fc"
+          strokeOpacity="0.7"
           strokeWidth="0.18"
           strokeLinejoin="round"
         />

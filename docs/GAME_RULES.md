@@ -16,7 +16,7 @@ schémas et libellés sont originaux.
   - une gemme **blanche** en forme de losange.
 - En mode spécial, deux gemmes supplémentaires par joueur :
   - le **Diamant**, triangle isocèle qui tient dans un rectangle de deux cases,
-    blanc et brillant ;
+    bleu cristallin ;
   - le **Corps noir**, rectangle de deux cases, noir.
 - Une grille de prospection pour noter les hypothèses.
 - Un moyen de tirer des rayons depuis le bord du plateau.

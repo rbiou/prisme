@@ -72,8 +72,8 @@ export function RulesScreen({ onBack }: { onBack: () => void }) {
           </p>
           <ul>
             <li>
-              <strong>Diamant</strong> : un triangle isocèle qui tient dans deux cases, blanc et
-              brillant. Il réfléchit les rayons comme une gemme, mais n’ajoute aucune couleur au
+              <strong>Diamant</strong> : un triangle isocèle qui tient dans deux cases, bleu
+              cristallin. Il réfléchit les rayons comme une gemme, mais n’ajoute aucune couleur au
               mélange.
             </li>
             <li>
