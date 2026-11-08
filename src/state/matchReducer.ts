@@ -1,4 +1,4 @@
-import { cellLabel, entryForLabel, sideLabel } from '../engine/board';
+import { cellLabel, entryForLabel } from '../engine/board';
 import { GEM_COLOR_LABELS, RAY_COLOR_LABELS, SPECIAL_ANSWER_LABELS, rayMixLabel } from '../engine/colors';
 import { isSerializedMine } from '../engine/mine';
 import {
@@ -172,8 +172,7 @@ function describeQuestion(question: {
   cell?: Cell;
 }): string {
   if (question.kind === 'wave' && question.entryLabel) {
-    const entry = entryForLabel(question.entryLabel);
-    return `Rayon ${question.entryLabel}${entry ? ` · côté ${sideLabel(entry.side)}` : ''}`;
+    return `Entrée ${question.entryLabel}`;
   }
   if (question.cell) return `Case ${cellLabel(question.cell)}`;
   return 'Votre question';
@@ -181,7 +180,7 @@ function describeQuestion(question: {
 
 function describeAnswer(answer: ScanAnswer): string {
   if (answer.kind === 'wave') {
-    if (answer.absorbed === true) return 'le signal a été absorbé';
+    if (answer.absorbed === true) return 'signal absorbé';
     const mix = rayMixLabel(answer.color);
     return `sortie ${answer.exit.label} · ${RAY_COLOR_LABELS[answer.color]}${
       mix ? ` (${mix})` : ''
@@ -200,7 +199,7 @@ function answerNotice(
   return {
     id,
     title,
-    body: `${question} : ${describeAnswer(answer)}.`,
+    body: `${question} → ${describeAnswer(answer)}.`,
     color: answer.kind === 'wave' && answer.absorbed !== true ? answer.color : null,
   };
 }

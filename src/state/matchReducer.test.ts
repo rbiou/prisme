@@ -176,7 +176,7 @@ describe('matchReducer — notifications de réponse', () => {
     expect(next.notice).toEqual({
       id: 'answer-1',
       title: 'Réponse reçue',
-      body: 'Rayon 3 · côté haut : sortie 12 · Orange (rouge + jaune).',
+      body: 'Entrée 3 → sortie 12 · Orange (rouge + jaune).',
       color: 'orange',
     });
   });
@@ -211,7 +211,7 @@ describe('matchReducer — notifications de réponse', () => {
       },
     });
 
-    expect(next.notice?.body).toBe('Case D5 : Bleu.');
+    expect(next.notice?.body).toBe('Case D5 → Bleu.');
   });
 
   it('n’efface pas une notification plus récente avec un ancien identifiant', () => {

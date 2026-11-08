@@ -4,7 +4,7 @@ import { ColorChip } from '../components/ColorChip';
 import { ColorMixLegend } from '../components/ColorMixLegend';
 import { Dialog } from '../components/Dialog';
 import { MineComposer, type NoteTool } from '../components/MineComposer';
-import { cellLabel, isCell, sideLabel } from '../engine/board';
+import { cellLabel, isCell } from '../engine/board';
 import { scanCell } from '../engine/cellScan';
 import { isColorMark, type ColorMark } from '../engine/colorMarks';
 import { canScan, canSubmit } from '../engine/endgame';
@@ -107,7 +107,7 @@ function loadColorMarks(key: string): ColorMark[] {
 
 function questionLabel(scan: Pick<ScanRecord, 'kind' | 'entry' | 'cell'>): string {
   if (scan.kind === 'wave' && scan.entry) {
-    return `Rayon ${scan.entry.label} · côté ${sideLabel(scan.entry.side)}`;
+    return `Entrée ${scan.entry.label}`;
   }
   if (scan.kind === 'cell' && scan.cell) {
     return `Case ${cellLabel(scan.cell)}`;
@@ -210,10 +210,12 @@ function GameJournal({
                   <div className="journal-answer">
                     {scan.answer.kind === 'wave' ? (
                       scan.answer.absorbed === true ? (
-                        <span className="journal-absorbed">Le signal a été absorbé</span>
+                        <span className="journal-absorbed">Signal absorbé</span>
                       ) : (
                         <>
-                          <span className="journal-exit">{scan.answer.exit.label}</span>
+                          <span className="journal-exit">
+                            Sortie {scan.answer.exit.label}
+                          </span>
                           <ColorChip color={scan.answer.color} />
                           {mix ? <span className="journal-mix">{mix}</span> : null}
                         </>

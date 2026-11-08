@@ -103,10 +103,10 @@ describe('GameScreen', () => {
     };
     const { onWave } = renderGame(game);
 
-    expect(screen.getByText('Rayon 3 · côté haut')).toBeInTheDocument();
-    const entry = screen.getByText('Rayon 3 · côté haut').closest('li');
+    expect(screen.getByText('Entrée 3')).toBeInTheDocument();
+    const entry = screen.getByText('Entrée 3').closest('li');
     expect(entry).not.toBeNull();
-    expect(within(entry as HTMLElement).getByText('12')).toBeInTheDocument();
+    expect(within(entry as HTMLElement).getByText('Sortie 12')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Rayon depuis le haut, entrée 1' }));
     expect(onWave).toHaveBeenCalledWith('1');
@@ -158,16 +158,16 @@ describe('GameScreen', () => {
 
     const filter = screen.getByRole('checkbox', { name: 'Mes questions uniquement' });
     expect(filter).toBeChecked();
-    expect(screen.queryByText('Rayon 5 · côté haut')).not.toBeInTheDocument();
+    expect(screen.queryByText('Entrée 5')).not.toBeInTheDocument();
     const entries = document.querySelectorAll('.journal-entry .journal-question');
-    expect(entries[0]?.textContent).toBe('Rayon 7 · côté haut');
-    expect(entries[1]?.textContent).toBe('Rayon 3 · côté haut');
+    expect(entries[0]?.textContent).toBe('Entrée 7');
+    expect(entries[1]?.textContent).toBe('Entrée 3');
 
     fireEvent.click(filter);
-    expect(screen.getByText('Rayon 5 · côté haut')).toBeInTheDocument();
+    expect(screen.getByText('Entrée 5')).toBeInTheDocument();
     const allEntries = document.querySelectorAll('.journal-entry .journal-question');
-    expect(allEntries[0]?.textContent).toBe('Rayon 7 · côté haut');
-    expect(allEntries[1]?.textContent).toBe('Rayon 5 · côté haut');
+    expect(allEntries[0]?.textContent).toBe('Entrée 7');
+    expect(allEntries[1]?.textContent).toBe('Entrée 5');
   });
 
   it('affiche la pastille et le mélange de couleurs dans le journal', () => {
@@ -308,7 +308,7 @@ describe('GameScreen', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Question de l’adversaire' });
     expect(dialog).toBeInTheDocument();
-    expect(screen.getByText('Rayon 1 · côté haut')).toBeInTheDocument();
+    expect(screen.getByText('Entrée 1')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer et envoyer' }));
 

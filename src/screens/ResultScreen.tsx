@@ -286,7 +286,7 @@ export function ResultScreen({
                 <span>
                   {scan.by === role ? 'Vous' : opponentName} ·{' '}
                   {scan.kind === 'wave' && scan.entry
-                    ? `rayon ${scan.entry.label}`
+                    ? `entrée ${scan.entry.label}`
                     : scan.cell
                       ? `case ${String.fromCharCode(65 + scan.cell.row)}${scan.cell.col + 1}`
                       : 'question'}
@@ -294,7 +294,7 @@ export function ResultScreen({
                 <span>
                   {scan.answer.kind === 'wave' ? (
                     scan.answer.absorbed === true ? (
-                      'Le signal a été absorbé'
+                      'Signal absorbé'
                     ) : (
                       <>
                         sortie {scan.answer.exit.label} ·{' '}
