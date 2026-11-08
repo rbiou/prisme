@@ -6,7 +6,6 @@ import {
 import { cellLabel } from '../engine/board';
 import { colorMarkAt, upsertColorMark, type ColorMark } from '../engine/colorMarks';
 import {
-  GEM_COLOR_LABELS,
   NOTE_COLORS,
   NOTE_COLOR_LABELS,
   NOTE_COLOR_SWATCHES,
@@ -45,12 +44,6 @@ import { Board } from './Board';
 import { fr } from '../i18n/fr';
 
 const GEM_FILL: Record<string, string> = NOTE_COLOR_SWATCHES;
-
-function kindColorLabel(kind: PieceKind): string {
-  return isSpecialPieceKind(kind)
-    ? 'Gemme spéciale'
-    : GEM_COLOR_LABELS[colorForKind(kind) ?? 'white'];
-}
 
 const EDGE_SIDE_OPTIONS: Array<{ value: CellEdgeSide; label: string; name: string }> = [
   { value: 'top', label: fr.placement.edgeTop, name: fr.placement.edgeTop },
@@ -512,14 +505,14 @@ export function MineComposer({
               onClick={() => selectKind(kind)}
               disabled={disabled}
               aria-pressed={activeKind === kind}
+              aria-label={`${labelForKind(kind)}${isPlaced ? ' (placée)' : ''}`}
+              title={labelForKind(kind)}
             >
               <GemPreview
                 kind={kind}
                 rotation={activeKind === kind ? rotation : 0}
                 flipped={activeKind === kind ? flipped : false}
               />
-              <span className="palette-label">{labelForKind(kind)}</span>
-              <span className="palette-meta">{isPlaced ? 'placée' : kindColorLabel(kind)}</span>
             </button>
           );
         })}

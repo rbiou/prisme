@@ -42,7 +42,9 @@ describe('PlacementScreen', () => {
     // Parallélogramme rouge ancré en B2 : sa boîte 3 × 1 tient dans le plateau.
     fireEvent.click(cells[11] as Element);
 
-    expect(screen.getAllByText('placée')).toHaveLength(1);
+    expect(
+      screen.getByRole('button', { name: 'Parallélogramme rouge (placée)' }),
+    ).toBeInTheDocument();
     expect(screen.queryByText('Mine incomplète ou invalide')).toBeInTheDocument();
   });
 });
