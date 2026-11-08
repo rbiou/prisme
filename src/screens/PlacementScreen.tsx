@@ -219,16 +219,6 @@ export function PlacementScreen({
                 </p>
               ) : null}
             </section>
-
-            <section className="card card--plain tips-card">
-              <h2>Repères de placement</h2>
-              <ul className="check-list">
-                <li>Rotations de 90° uniquement, jamais de retournement.</li>
-                <li>Contacts par un coin autorisés, bords collés interdits.</li>
-                <li>Chaque gemme doit être atteignable par au moins un rayon.</li>
-                <li>Une boucle de rayon rend la mine invalide.</li>
-              </ul>
-            </section>
           </aside>
         </div>
       ) : (

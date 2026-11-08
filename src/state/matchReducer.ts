@@ -1,5 +1,5 @@
 import { cellLabel, entryForLabel, sideLabel } from '../engine/board';
-import { GEM_COLOR_LABELS, RAY_COLOR_LABELS, SPECIAL_ANSWER_LABELS } from '../engine/colors';
+import { GEM_COLOR_LABELS, RAY_COLOR_LABELS, SPECIAL_ANSWER_LABELS, rayMixLabel } from '../engine/colors';
 import { isSerializedMine } from '../engine/mine';
 import {
   answerScan,
@@ -18,6 +18,7 @@ import type {
   GameMode,
   GameState,
   PlayerId,
+  RayColor,
   ScanRecord,
   SerializedMine,
   SerializedNote,
@@ -46,6 +47,8 @@ export interface MatchNotice {
   id: string;
   title: string;
   body: string;
+  /** Couleur de la réponse, pour afficher la pastille dans la notification. */
+  color?: RayColor | null;
 }
 
 export interface MatchState {
@@ -178,9 +181,11 @@ function describeQuestion(question: {
 
 function describeAnswer(answer: ScanAnswer): string {
   if (answer.kind === 'wave') {
-    return answer.absorbed === true
-      ? 'le signal a été absorbé'
-      : `sortie ${answer.exit.label} · ${RAY_COLOR_LABELS[answer.color]}`;
+    if (answer.absorbed === true) return 'le signal a été absorbé';
+    const mix = rayMixLabel(answer.color);
+    return `sortie ${answer.exit.label} · ${RAY_COLOR_LABELS[answer.color]}${
+      mix ? ` (${mix})` : ''
+    }`;
   }
   if (answer.special) return SPECIAL_ANSWER_LABELS[answer.special];
   return answer.color ? GEM_COLOR_LABELS[answer.color] : 'aucune gemme';
@@ -192,7 +197,12 @@ function answerNotice(
   question: string,
   answer: ScanAnswer,
 ): MatchNotice {
-  return { id, title, body: `${question} : ${describeAnswer(answer)}.` };
+  return {
+    id,
+    title,
+    body: `${question} : ${describeAnswer(answer)}.`,
+    color: answer.kind === 'wave' && answer.absorbed !== true ? answer.color : null,
+  };
 }
 
 function handleMessage(state: MatchState, message: NetworkMessage, now: number): MatchState {

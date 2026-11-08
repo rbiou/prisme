@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Board } from '../components/Board';
 import { ColorChip } from '../components/ColorChip';
 import { ColorMixLegend } from '../components/ColorMixLegend';
 import { Dialog } from '../components/Dialog';
 import { MineComposer, type NoteTool } from '../components/MineComposer';
-import { cellLabel, isCell, parseCellLabel, sideLabel } from '../engine/board';
+import { cellLabel, isCell, sideLabel } from '../engine/board';
 import { scanCell } from '../engine/cellScan';
 import { isColorMark, type ColorMark } from '../engine/colorMarks';
 import { canScan, canSubmit } from '../engine/endgame';
@@ -18,7 +18,7 @@ import {
 import { isNoteEdgeMark, type NoteEdgeMark } from '../engine/noteEdges';
 import { validateMine } from '../engine/placement';
 import { simulateRay } from '../engine/ray';
-import { RAY_COLOR_LABELS, SPECIAL_ANSWER_LABELS } from '../engine/colors';
+import { RAY_COLOR_LABELS, SPECIAL_ANSWER_LABELS, rayMixLabel } from '../engine/colors';
 import type {
   Cell,
   Mine,
@@ -149,91 +149,132 @@ function GameJournal({
   onSimulate,
   onClearSimulation,
 }: JournalProps) {
+  const [onlyMine, setOnlyMine] = useState(true);
+  const entries = scans
+    .map((scan, index) => ({ scan, index }))
+    .filter(({ scan }) => !onlyMine || scan.by === role)
+    .reverse();
+
+  const filter = (
+    <label className="journal-filter">
+      <input
+        type="checkbox"
+        checked={onlyMine}
+        onChange={(event) => setOnlyMine(event.target.checked)}
+      />
+      <span>Mes questions uniquement</span>
+    </label>
+  );
+
   if (scans.length === 0) {
-    return <p className="empty-state">{fr.game.emptyJournal}</p>;
+    return (
+      <div className="journal-shell">
+        {filter}
+        <p className="empty-state">{fr.game.emptyJournal}</p>
+      </div>
+    );
   }
 
   return (
-    <ol className="journal" aria-live="polite">
-      {scans.map((scan, index) => {
-        const byMe = scan.by === role;
-        const isConfirmation = Boolean(scan.confirmationOf);
-        return (
-          <li key={scan.id} className={`journal-entry${isConfirmation ? ' is-confirmation' : ''}`}>
-            <div className="journal-index" aria-hidden="true">
-              {index + 1}
-            </div>
-            <div className="journal-main">
-              <div className="journal-meta">
-                <span className={`journal-author${byMe ? ' is-me' : ''}`}>
-                  {byMe ? 'Vous' : opponentName}
-                </span>
-                <span className="journal-question">{questionLabel(scan)}</span>
-                {isConfirmation ? (
-                  <span className="badge badge--soft">Confirmation gratuite</span>
-                ) : null}
-              </div>
-              <div className="journal-answer">
-                {scan.answer.kind === 'wave' ? (
-                  scan.answer.absorbed === true ? (
-                    <span className="journal-absorbed">Le signal a été absorbé</span>
-                  ) : (
-                    <>
-                      <span className="journal-exit">{scan.answer.exit.label}</span>
-                      <ColorChip color={scan.answer.color} />
-                    </>
-                  )
-                ) : scan.answer.special ? (
-                  <span className="journal-special">
-                    {SPECIAL_ANSWER_LABELS[scan.answer.special]}
-                  </span>
-                ) : (
-                  <ColorChip
-                    color={scan.answer.color}
-                    label={scan.answer.color ? undefined : 'Rien'}
-                  />
-                )}
-              </div>
-              {byMe && scan.kind === 'wave' && scan.entry && scan.answer.kind === 'wave' ? (
-                <div className="journal-simulation">
-                  <button type="button" className="text-link" onClick={() => onSimulate(scan)}>
-                    {simulation?.scanId === scan.id ? 'Relancer la simulation' : 'Simuler ce rayon'}
-                  </button>
-                  {simulation?.scanId === scan.id ? (
-                    <div
-                      className={`simulation-inline${simulation.matches ? '' : ' is-mismatch'}`}
-                      role="status"
-                    >
-                      <span>
-                        {privateRayLabel(simulation.result)}
-                        {simulation.result.status === 'exit'
-                          ? ` · ${RAY_COLOR_LABELS[simulation.result.color]}`
-                          : null}
+    <div className="journal-shell">
+      {filter}
+      {entries.length === 0 ? (
+        <p className="empty-state">{fr.game.emptyJournalMine}</p>
+      ) : (
+        <ol className="journal" aria-live="polite">
+          {entries.map(({ scan, index }) => {
+            const byMe = scan.by === role;
+            const isConfirmation = Boolean(scan.confirmationOf);
+            const mix =
+              scan.answer.kind === 'wave' && scan.answer.absorbed !== true
+                ? rayMixLabel(scan.answer.color)
+                : null;
+            return (
+              <li
+                key={scan.id}
+                className={`journal-entry${isConfirmation ? ' is-confirmation' : ''}`}
+              >
+                <div className="journal-index" aria-hidden="true">
+                  {index + 1}
+                </div>
+                <div className="journal-main">
+                  <div className="journal-meta">
+                    <span className={`journal-author${byMe ? ' is-me' : ''}`}>
+                      {byMe ? 'Vous' : opponentName}
+                    </span>
+                    <span className="journal-question">{questionLabel(scan)}</span>
+                    {isConfirmation ? (
+                      <span className="badge badge--soft">Confirmation gratuite</span>
+                    ) : null}
+                  </div>
+                  <div className="journal-answer">
+                    {scan.answer.kind === 'wave' ? (
+                      scan.answer.absorbed === true ? (
+                        <span className="journal-absorbed">Le signal a été absorbé</span>
+                      ) : (
+                        <>
+                          <span className="journal-exit">{scan.answer.exit.label}</span>
+                          <ColorChip color={scan.answer.color} />
+                          {mix ? <span className="journal-mix">{mix}</span> : null}
+                        </>
+                      )
+                    ) : scan.answer.special ? (
+                      <span className="journal-special">
+                        {SPECIAL_ANSWER_LABELS[scan.answer.special]}
                       </span>
-                      <strong>
-                        {simulation.matches ? 'Cohérente avec la réponse' : 'Contredit la réponse'}
-                      </strong>
-                      <button type="button" className="text-link" onClick={onClearSimulation}>
-                        Masquer
+                    ) : (
+                      <ColorChip
+                        color={scan.answer.color}
+                        label={scan.answer.color ? undefined : 'Rien'}
+                      />
+                    )}
+                  </div>
+                  {byMe && scan.kind === 'wave' && scan.entry && scan.answer.kind === 'wave' ? (
+                    <div className="journal-simulation">
+                      <button type="button" className="text-link" onClick={() => onSimulate(scan)}>
+                        {simulation?.scanId === scan.id
+                          ? 'Relancer la simulation'
+                          : 'Simuler ce rayon'}
                       </button>
+                      {simulation?.scanId === scan.id ? (
+                        <div
+                          className={`simulation-inline${simulation.matches ? '' : ' is-mismatch'}`}
+                          role="status"
+                        >
+                          <span>
+                            {privateRayLabel(simulation.result)}
+                            {simulation.result.status === 'exit'
+                              ? ` · ${RAY_COLOR_LABELS[simulation.result.color]}`
+                              : null}
+                          </span>
+                          <strong>
+                            {simulation.matches
+                              ? 'Cohérente avec la réponse'
+                              : 'Contredit la réponse'}
+                          </strong>
+                          <button type="button" className="text-link" onClick={onClearSimulation}>
+                            Masquer
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
+                  {byMe && !isConfirmation && canRequestConfirmation ? (
+                    <button
+                      type="button"
+                      className="text-link"
+                      onClick={() => onRequestConfirmation(scan.id)}
+                    >
+                      {fr.game.confirmAgain}
+                    </button>
+                  ) : null}
                 </div>
-              ) : null}
-              {byMe && !isConfirmation && canRequestConfirmation ? (
-                <button
-                  type="button"
-                  className="text-link"
-                  onClick={() => onRequestConfirmation(scan.id)}
-                >
-                  {fr.game.confirmAgain}
-                </button>
-              ) : null}
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </div>
   );
 }
 
@@ -291,7 +332,6 @@ export function GameScreen({
   const [edgeMarks, setEdgeMarks] = useState<NoteEdgeMark[]>(() => loadEdgeMarks(edgesKey));
   const [colorMarks, setColorMarks] = useState<ColorMark[]>(() => loadColorMarks(dotsKey));
   const [simulation, setSimulation] = useState<ActiveSimulation | null>(null);
-  const [cellInput, setCellInput] = useState('');
   const [cellError, setCellError] = useState<string | null>(null);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -349,7 +389,6 @@ export function GameScreen({
       state.sessionPhase !== 'closed');
   const canScanNow = canScan(game, role) && connected;
   const canSubmitNow = canSubmit(game, role) && connected;
-  const submitToolReady = tool === 'scan';
   // Chaque joueur ne grise que les entrées qu’il a lui-même demandées.
   const askedEntries = useMemo(
     () =>
@@ -448,21 +487,6 @@ export function GameScreen({
     }
   }
 
-  function submitCell(event: FormEvent) {
-    event.preventDefault();
-    const cell = parseCellLabel(cellInput);
-    if (!cell) {
-      setCellError('Coordonnées invalides. Exemple : E4.');
-      return;
-    }
-    if (onCell(cell)) {
-      setCellInput('');
-      setCellError(null);
-    } else {
-      setCellError('La case n’a pas pu être sondée.');
-    }
-  }
-
   function simulateScan(scan: ScanRecord) {
     if (scan.kind !== 'wave' || !scan.entry || scan.answer.kind !== 'wave') return;
     const result = simulateRay(notes, scan.entry);
@@ -498,10 +522,7 @@ export function GameScreen({
         myMine={myMine}
         myNotes={notes}
         myMarks={{ crosses, edges: edgeMarks, colors: colorMarks }}
-        mySalt={locked.salt}
-        myHash={locked.hash}
         opponentName={state.opponentName}
-        opponentHash={state.opponentHash}
         reveals={state.reveals}
         onNewGame={onNewGame}
         onHome={onHome}
@@ -593,16 +614,16 @@ export function GameScreen({
 
       {tab === 'prospection' ? (
         <div className="prospection-layout">
-          <section className="board-panel card card--plain">
-            <div className="panel-heading">
-              <div>
-                <p className="kicker">Prospection</p>
-                <h2>Vos notes privées</h2>
+          <div className="prospection-main">
+            <section className="board-panel card card--plain">
+              <div className="panel-heading">
+                <div>
+                  <p className="kicker">Prospection</p>
+                  <h2>Vos notes privées</h2>
+                </div>
+                <span className="badge badge--soft">Notes privées</span>
               </div>
-              <span className="badge badge--soft">Notes privées</span>
-            </div>
 
-            <>
               <div className="notes-banner">
                 <span>{fr.game.notesHint}</span>
               </div>
@@ -625,78 +646,14 @@ export function GameScreen({
                 onScanCell={scanCellFromGrid}
                 onScanEntry={onWave}
                 askedEntries={askedEntries}
-                showCoordinateInput={false}
+                showHints={false}
                 boardAriaLabel="Plateau de notes privées : sondez les rayons et les cases tout en prenant vos notes"
                 path={simulation?.result.path ?? null}
                 pathColor={simulation?.result.color ?? 'white'}
               />
-              {tool === 'scan' ? (
-                <form className="coordinate-row" onSubmit={submitCell}>
-                  <label className="field field--inline">
-                    <span>{fr.game.cellLabel}</span>
-                    <input
-                      type="text"
-                      value={cellInput}
-                      onChange={(event) => {
-                        setCellInput(event.target.value);
-                        setCellError(null);
-                      }}
-                      placeholder={fr.game.cellPlaceholder}
-                      autoComplete="off"
-                      autoCapitalize="characters"
-                      disabled={!canScanNow}
-                    />
-                  </label>
-                  <button
-                    type="submit"
-                    className="btn btn--secondary"
-                    disabled={!canScanNow || !cellInput.trim()}
-                  >
-                    {fr.game.scanCell}
-                  </button>
-                </form>
-              ) : null}
               {cellError ? (
                 <p className="inline-alert" role="alert">
                   {cellError}
-                </p>
-              ) : null}
-            </>
-          </section>
-
-          <aside className="prospection-side">
-            <section className="card card--plain action-card">
-              <div className="panel-heading">
-                <div>
-                  <p className="kicker">Proposition</p>
-                  <h2>Soumettre la mine</h2>
-                </div>
-              </div>
-              <p>
-                Votre proposition doit contenir les cinq gemmes, avec leurs formes, rotations et
-                positions exactes.
-              </p>
-              {!notesStructureValidation.ok ? (
-                <p className="hint">{fr.game.submitDisabled}</p>
-              ) : null}
-              {!submitToolReady ? <p className="hint">{fr.game.submitNeedsScan}</p> : null}
-              <button
-                type="button"
-                className="btn btn--primary btn--wide"
-                onClick={() => setSubmitOpen(true)}
-                disabled={!canSubmitNow || !notesStructureValidation.ok || !submitToolReady}
-              >
-                {fr.game.submit}
-              </button>
-              {game.phase === 'final-turn' ? (
-                <p className="callout callout--warning">
-                  Dernier tour : une proposition correcte suffit pour l’égalité, une proposition
-                  incorrecte fait perdre immédiatement.
-                </p>
-              ) : null}
-              {submitError ? (
-                <p className="inline-alert" role="alert">
-                  {submitError}
                 </p>
               ) : null}
             </section>
@@ -723,37 +680,39 @@ export function GameScreen({
               />
             </section>
 
+            <div className="submit-panel">
+              <button
+                type="button"
+                className="btn btn--primary btn--wide"
+                onClick={() => setSubmitOpen(true)}
+                disabled={!canSubmitNow || !notesStructureValidation.ok}
+              >
+                {fr.game.submit}
+              </button>
+              {!notesStructureValidation.ok ? (
+                <p className="hint">{fr.game.submitDisabled}</p>
+              ) : null}
+              {game.phase === 'final-turn' ? (
+                <p className="callout callout--warning">
+                  Dernier tour : une proposition correcte suffit pour l’égalité, une proposition
+                  incorrecte fait perdre immédiatement.
+                </p>
+              ) : null}
+              {submitError ? (
+                <p className="inline-alert" role="alert">
+                  {submitError}
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <aside className="prospection-side">
             <section className="card card--plain legend-card">
               <h2>Repères de couleur</h2>
               <p className="hint">
                 Une couleur n’est jamais le seul indice : le nom est toujours écrit.
               </p>
-              <div className="color-legend">
-                {(
-                  [
-                    'transparent',
-                    'red',
-                    'yellow',
-                    'blue',
-                    'white',
-                    'orange',
-                    'violet',
-                    'green',
-                    'black',
-                    'pink',
-                    'light-yellow',
-                    'light-blue',
-                    'light-orange',
-                    'light-violet',
-                    'light-green',
-                    'gray',
-                  ] as RayColor[]
-                ).map((color) => (
-                  <ColorChip key={color} color={color} size="small" />
-                ))}
-              </div>
-              <h3 className="legend-subtitle">Mélanges</h3>
-              <ColorMixLegend />
+              <ColorMixLegend mixesOnly />
             </section>
           </aside>
         </div>
@@ -772,38 +731,6 @@ export function GameScreen({
             </div>
             <p className="hint">{fr.game.noPeek}</p>
           </section>
-
-          <aside className="own-mine-side">
-            <section className="card card--plain">
-              <h2>Engagement</h2>
-              <p>
-                Votre mine est engagée par un SHA-256. À la fin, vous révélerez la mine et le sel ;
-                l’adversaire pourra vérifier qu’elle n’a pas changé.
-              </p>
-              <dl className="meta-list">
-                <div>
-                  <dt>{fr.game.hash}</dt>
-                  <dd>
-                    <code>{locked.hash}</code>
-                  </dd>
-                </div>
-                <div>
-                  <dt>Engagement adverse</dt>
-                  <dd>
-                    <code>{state.opponentHash ?? 'En attente'}</code>
-                  </dd>
-                </div>
-              </dl>
-            </section>
-            <section className="card card--plain">
-              <h2>Rappel</h2>
-              <ul className="check-list">
-                <li>La mine ne peut plus être modifiée.</li>
-                <li>Chaque question est répondue sur cet appareil, puis confirmée.</li>
-                <li>La trajectoire du rayon reste privée.</li>
-              </ul>
-            </section>
-          </aside>
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { AppHeader } from './components/AppHeader';
+import { ColorChip } from './components/ColorChip';
 import { PwaBanner } from './components/PwaBanner';
 import { useHashRoute } from './hooks/useHashRoute';
 import { usePersistentState } from './hooks/usePersistentState';
@@ -300,7 +301,12 @@ export default function App() {
           <div className="toast toast--info" role="status">
             <div className="toast-body">
               <strong>{state.notice.title}</strong>
-              <span>{state.notice.body}</span>
+              <div className="toast-answer">
+                {state.notice.color ? (
+                  <ColorChip color={state.notice.color} size="small" />
+                ) : null}
+                <span>{state.notice.body}</span>
+              </div>
             </div>
             <button
               type="button"

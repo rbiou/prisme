@@ -22,10 +22,14 @@ const MIXES: Array<{ colors: RayColor[]; result: RayColor }> = [
 ];
 
 /** Table des seize mélanges de couleurs, partagée par les règles et la partie. */
-export function ColorMixLegend() {
+export function ColorMixLegend({ mixesOnly = false }: { mixesOnly?: boolean }) {
+  const mixes = mixesOnly ? MIXES.filter((mix) => mix.colors.length >= 2) : MIXES;
   return (
-    <div className="mix-grid" aria-label="Table des seize mélanges">
-      {MIXES.map((mix) => (
+    <div
+      className="mix-grid"
+      aria-label={mixesOnly ? 'Table des mélanges de couleurs' : 'Table des seize mélanges'}
+    >
+      {mixes.map((mix) => (
         <div key={`${mix.colors.join('-')}-${mix.result}`} className="mix-item">
           <div className="mix-colors">
             {mix.colors.length === 0 ? (

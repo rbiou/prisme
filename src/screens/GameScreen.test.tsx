@@ -112,6 +112,89 @@ describe('GameScreen', () => {
     expect(onWave).toHaveBeenCalledWith('1');
   });
 
+  it('filtre le journal sur mes questions par défaut et affiche le plus récent en haut', () => {
+    const game: GameState = {
+      ...createGame('host'),
+      scans: [
+        {
+          id: 'scan-old',
+          by: 'host',
+          kind: 'wave',
+          entry: entryForLabel('3'),
+          answer: {
+            kind: 'wave',
+            exit: entryForLabel('12') as NonNullable<ReturnType<typeof entryForLabel>>,
+            color: 'orange',
+          },
+          createdAt: 1,
+        },
+        {
+          id: 'scan-opponent',
+          by: 'guest',
+          kind: 'wave',
+          entry: entryForLabel('5'),
+          answer: {
+            kind: 'wave',
+            exit: entryForLabel('14') as NonNullable<ReturnType<typeof entryForLabel>>,
+            color: 'green',
+          },
+          createdAt: 2,
+        },
+        {
+          id: 'scan-new',
+          by: 'host',
+          kind: 'wave',
+          entry: entryForLabel('7'),
+          answer: {
+            kind: 'wave',
+            exit: entryForLabel('16') as NonNullable<ReturnType<typeof entryForLabel>>,
+            color: 'violet',
+          },
+          createdAt: 3,
+        },
+      ],
+    };
+    renderGame(game);
+
+    const filter = screen.getByRole('checkbox', { name: 'Mes questions uniquement' });
+    expect(filter).toBeChecked();
+    expect(screen.queryByText('Rayon 5 · côté haut')).not.toBeInTheDocument();
+    const entries = document.querySelectorAll('.journal-entry .journal-question');
+    expect(entries[0]?.textContent).toBe('Rayon 7 · côté haut');
+    expect(entries[1]?.textContent).toBe('Rayon 3 · côté haut');
+
+    fireEvent.click(filter);
+    expect(screen.getByText('Rayon 5 · côté haut')).toBeInTheDocument();
+    const allEntries = document.querySelectorAll('.journal-entry .journal-question');
+    expect(allEntries[0]?.textContent).toBe('Rayon 7 · côté haut');
+    expect(allEntries[1]?.textContent).toBe('Rayon 5 · côté haut');
+  });
+
+  it('affiche la pastille et le mélange de couleurs dans le journal', () => {
+    const game: GameState = {
+      ...createGame('host'),
+      scans: [
+        {
+          id: 'scan-mix',
+          by: 'host',
+          kind: 'wave',
+          entry: entryForLabel('3'),
+          answer: {
+            kind: 'wave',
+            exit: entryForLabel('12') as NonNullable<ReturnType<typeof entryForLabel>>,
+            color: 'orange',
+          },
+          createdAt: 1,
+        },
+      ],
+    };
+    renderGame(game);
+
+    expect(screen.getByText('rouge + jaune')).toBeInTheDocument();
+    const entry = document.querySelector('.journal-entry') as HTMLElement;
+    expect(within(entry).getByText('Orange')).toBeInTheDocument();
+  });
+
   it('grise les étiquettes de rayon déjà demandées', () => {
     const game: GameState = {
       ...createGame('host'),
@@ -204,11 +287,11 @@ describe('GameScreen', () => {
     expect(onCell).toHaveBeenCalledWith({ col: 4, row: 4 });
   });
 
-  it('affiche la table des mélanges de couleurs', () => {
+  it('affiche les mélanges de couleurs sans les couleurs de base', () => {
     renderGame();
 
-    expect(screen.getByLabelText('Table des seize mélanges')).toBeInTheDocument();
-    expect(screen.getByText('Mélanges')).toBeInTheDocument();
+    expect(screen.getByLabelText('Table des mélanges de couleurs')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Table des seize mélanges')).toBeNull();
   });
 
   it('demande une confirmation privée avant de répondre à un scan adverse', () => {

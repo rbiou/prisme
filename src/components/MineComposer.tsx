@@ -3,7 +3,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { cellLabel, parseCellLabel } from '../engine/board';
+import { cellLabel } from '../engine/board';
 import { colorMarkAt, upsertColorMark, type ColorMark } from '../engine/colorMarks';
 import {
   GEM_COLOR_LABELS,
@@ -148,7 +148,8 @@ export interface MineComposerProps {
   onScanCell?: (cell: Cell) => void;
   onScanEntry?: (label: string) => void;
   askedEntries?: ReadonlySet<string> | null;
-  showCoordinateInput?: boolean;
+  /** Masquer les rappels d’outil sous le plateau (écran de partie). */
+  showHints?: boolean;
 }
 
 export function MineComposer({
@@ -173,13 +174,12 @@ export function MineComposer({
   onScanCell,
   onScanEntry,
   askedEntries = null,
-  showCoordinateInput = true,
+  showHints = true,
 }: MineComposerProps) {
   const [internalKind, setInternalKind] = useState<PieceKind>('red-parallelogram');
   const [rotation, setRotation] = useState<Rotation>(0);
   const [flipped, setFlipped] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [coordinate, setCoordinate] = useState('');
   const [internalTool, setInternalTool] = useState<NoteTool>(onScanCell ? 'scan' : 'piece');
   const [edgeSide, setEdgeSide] = useState<CellEdgeSide>('top');
   const [markColor, setMarkColor] = useState<NoteColor>('red');
@@ -196,6 +196,11 @@ export function MineComposer({
 
   const activeKind = selectedKind ?? internalKind;
   const paletteKinds = pieceKindsForMode(mode);
+  const orderedPalette = [...paletteKinds].sort(
+    (a, b) =>
+      Number(mine.pieces.some((piece) => piece.kind === a)) -
+      Number(mine.pieces.some((piece) => piece.kind === b)),
+  );
   const placed = mine.pieces.find((piece) => piece.kind === activeKind);
   const scanMode = tool === 'scan';
   const crossMode = Boolean(onCrossesChange) && tool === 'cross';
@@ -494,20 +499,10 @@ export function MineComposer({
     setMessage(null);
   }
 
-  function placeFromCoordinate() {
-    const cell = parseCellLabel(coordinate);
-    if (!cell) {
-      setMessage('Coordonnées invalides. Exemple : E4.');
-      return;
-    }
-    placeAt(cell);
-    setCoordinate('');
-  }
-
   return (
     <div className="mine-composer">
       <div className="palette" role="group" aria-label={fr.placement.palette}>
-        {paletteKinds.map((kind) => {
+        {orderedPalette.map((kind) => {
           const isPlaced = mine.pieces.some((piece) => piece.kind === kind);
           return (
             <button
@@ -756,49 +751,17 @@ export function MineComposer({
         />
       </div>
 
-      {showCoordinateInput ? (
-        <div className="coordinate-row">
-          <label className="field field--inline">
-            <span>{fr.placement.coordinateLabel}</span>
-            <input
-              type="text"
-              value={coordinate}
-              onChange={(event) => setCoordinate(event.target.value)}
-              placeholder={fr.placement.coordinatePlaceholder}
-              autoComplete="off"
-              autoCapitalize="characters"
-              inputMode="text"
-              disabled={disabled}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  placeFromCoordinate();
-                }
-              }}
-            />
-          </label>
-          <button
-            type="button"
-            className="btn btn--ghost"
-            onClick={placeFromCoordinate}
-            disabled={disabled}
-          >
-            {fr.placement.placeAt}
-          </button>
-        </div>
-      ) : null}
-
-      <p className="hint">
-        {scanMode
-          ? fr.placement.scanHint
-          : dotMode
+      {showHints && !scanMode ? (
+        <p className="hint">
+          {dotMode
             ? fr.placement.dotHint
             : edgeMode
               ? fr.placement.edgeHint
               : crossMode
                 ? fr.placement.crossHint
                 : fr.placement.placeHint}
-      </p>
+        </p>
+      ) : null}
       <p className="visually-hidden">{fr.placement.dragHint}</p>
       {message ? (
         <p className="inline-alert" role="status">

@@ -23,7 +23,7 @@ export function RulesScreen({ onBack }: { onBack: () => void }) {
         <a href="#regles-rayons">Rayons</a>
         <a href="#regles-tour">Tour</a>
         <a href="#regles-fin">Fin de partie</a>
-        <a href="#regles-integrite">Intégrité</a>
+        <a href="#regles-integrite">Révélation</a>
       </nav>
 
       <article className="rules-content">
@@ -191,13 +191,12 @@ export function RulesScreen({ onBack }: { onBack: () => void }) {
         </section>
 
         <section id="regles-integrite">
-          <h2>7. Révélation et intégrité</h2>
+          <h2>7. Révélation et vérification</h2>
           <p>
-            Au début, chaque joueur engage sa mine avec un SHA-256 et un sel aléatoire. À la fin,
-            les deux mines et les sels sont révélés. Chaque client vérifie l’engagement, puis peut
-            rejouer tous les scans enregistrés contre la mine révélée. Une incohérence est signalée,
-            mais la confiance reste nécessaire pendant la partie : le pair-à-pair ne permet pas une
-            preuve forte en temps réel.
+            Chaque joueur garde sa mine secrète jusqu’à la fin. Les deux mines sont alors révélées,
+            et chaque client peut rejouer les scans enregistrés contre la mine révélée pour vérifier
+            que les réponses étaient cohérentes. La confiance reste nécessaire pendant la partie :
+            le pair-à-pair ne permet pas une preuve forte en temps réel.
           </p>
           <p className="fine-print">
             Aucun backend propre, aucun compte, aucun cookie. Le code à six chiffres sert de

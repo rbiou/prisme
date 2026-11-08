@@ -138,6 +138,23 @@ export function mixRayColorMasks(mask: number, color: GemColor): number {
   return mask | colorMaskForGem(color);
 }
 
+const COLOR_TO_MASK: Record<RayColor, number> = Object.fromEntries(
+  Object.entries(MASK_TO_COLOR).map(([mask, color]) => [color, Number(mask)]),
+) as Record<RayColor, number>;
+
+/** Couleurs de gemmes qui composent une couleur de rayon. */
+export function gemColorsForRayColor(color: RayColor): GemColor[] {
+  const mask = COLOR_TO_MASK[color] ?? 0;
+  return GEM_COLORS.filter((gem) => (mask & GEM_COLOR_BITS[gem]) !== 0);
+}
+
+/** Libellé d’un vrai mélange (« rouge + jaune »), `null` pour une couleur de base. */
+export function rayMixLabel(color: RayColor): string | null {
+  const colors = gemColorsForRayColor(color);
+  if (colors.length < 2) return null;
+  return colors.map((gem) => GEM_COLOR_LABELS[gem].toLowerCase()).join(' + ');
+}
+
 export function isRayColor(value: string): value is RayColor {
   return value in RAY_COLOR_LABELS;
 }

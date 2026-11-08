@@ -65,10 +65,7 @@ function renderResult(options: { onNewGame?: () => void; onHome?: () => void } =
       myMine={MY_MINE}
       myNotes={{ version: 1, pieces: [] }}
       myMarks={{ crosses: [], edges: [], colors: [] }}
-      mySalt={'a'.repeat(32)}
-      myHash={'a'.repeat(64)}
       opponentName="Alex"
-      opponentHash={'b'.repeat(64)}
       reveals={{}}
       onNewGame={onNewGame}
       onHome={onHome}

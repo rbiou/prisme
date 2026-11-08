@@ -176,7 +176,8 @@ describe('matchReducer — notifications de réponse', () => {
     expect(next.notice).toEqual({
       id: 'answer-1',
       title: 'Réponse reçue',
-      body: 'Rayon 3 · côté haut : sortie 12 · Orange.',
+      body: 'Rayon 3 · côté haut : sortie 12 · Orange (rouge + jaune).',
+      color: 'orange',
     });
   });
 

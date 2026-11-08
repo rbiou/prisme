@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   GEM_COLORS,
   RAY_COLOR_LABELS,
+  gemColorsForRayColor,
   isGemColor,
   isRayColor,
   mixColors,
   rayColorFromMask,
+  rayMixLabel,
 } from './colors';
 import type { GemColor, RayColor } from './types';
 
@@ -72,5 +74,20 @@ describe('mélange des couleurs', () => {
     }
     expect(isRayColor('mauve')).toBe(false);
     expect(isGemColor('black')).toBe(false);
+  });
+
+  it('décompose une couleur de rayon en gemmes composantes', () => {
+    expect(gemColorsForRayColor('orange')).toEqual(['red', 'yellow']);
+    expect(gemColorsForRayColor('gray')).toEqual(['red', 'yellow', 'blue', 'white']);
+    expect(gemColorsForRayColor('transparent')).toEqual([]);
+    expect(gemColorsForRayColor('red')).toEqual(['red']);
+  });
+
+  it('ne donne un libellé de mélange que pour au moins deux couleurs', () => {
+    expect(rayMixLabel('orange')).toBe('rouge + jaune');
+    expect(rayMixLabel('light-violet')).toBe('rouge + bleu + blanc');
+    expect(rayMixLabel('red')).toBeNull();
+    expect(rayMixLabel('white')).toBeNull();
+    expect(rayMixLabel('transparent')).toBeNull();
   });
 });
