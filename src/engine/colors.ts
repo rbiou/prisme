@@ -53,6 +53,7 @@ export const NOTE_COLORS: NoteColor[] = [
 export const NOTE_COLOR_LABELS: Record<NoteColor, string> = {
   ...GEM_COLOR_LABELS,
   ...SPECIAL_COLOR_LABELS,
+  'black-body': 'Noir',
 };
 
 export const NOTE_COLOR_SWATCHES: Record<NoteColor, string> = {

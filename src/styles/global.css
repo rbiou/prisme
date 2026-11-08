@@ -1082,6 +1082,7 @@ input[type='checkbox'] {
 
 .edge-color {
   display: inline-flex;
+  flex: 0 0 auto;
   gap: 6px;
   align-items: center;
   min-height: 34px;
@@ -1089,6 +1090,7 @@ input[type='checkbox'] {
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 650;
+  white-space: nowrap;
   background: rgba(4, 10, 20, 0.48);
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -1107,6 +1109,7 @@ input[type='checkbox'] {
 }
 
 .edge-color-swatch {
+  flex: 0 0 auto;
   width: 14px;
   height: 14px;
   border: 1px solid rgba(255, 255, 255, 0.25);

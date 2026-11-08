@@ -5,11 +5,7 @@ import {
 } from 'react';
 import { cellLabel } from '../engine/board';
 import { colorMarkAt, upsertColorMark, type ColorMark } from '../engine/colorMarks';
-import {
-  NOTE_COLORS,
-  NOTE_COLOR_LABELS,
-  NOTE_COLOR_SWATCHES,
-} from '../engine/colors';
+import { NOTE_COLORS, NOTE_COLOR_LABELS, NOTE_COLOR_SWATCHES } from '../engine/colors';
 import { upsertNoteEdge, type CellEdgeSide, type NoteEdgeMark } from '../engine/noteEdges';
 import {
   canFlip,
@@ -494,90 +490,6 @@ export function MineComposer({
 
   return (
     <div className="mine-composer">
-      <div className="palette" role="group" aria-label={fr.placement.palette}>
-        {orderedPalette.map((kind) => {
-          const isPlaced = mine.pieces.some((piece) => piece.kind === kind);
-          return (
-            <button
-              key={kind}
-              type="button"
-              className={`palette-item${activeKind === kind ? ' is-active' : ''}${isPlaced ? ' is-placed' : ''}`}
-              onClick={() => selectKind(kind)}
-              disabled={disabled}
-              aria-pressed={activeKind === kind}
-              aria-label={`${labelForKind(kind)}${isPlaced ? ' (placée)' : ''}`}
-              title={labelForKind(kind)}
-            >
-              <GemPreview
-                kind={kind}
-                rotation={activeKind === kind ? rotation : 0}
-                flipped={activeKind === kind ? flipped : false}
-              />
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="composer-toolbar">
-        <div className="composer-selected">
-          <GemPreview
-            kind={activeKind}
-            rotation={rotation}
-            flipped={flipped}
-            className="gem-preview--small"
-          />
-          <div>
-            <strong>{labelForKind(activeKind)}</strong>
-            <span>
-              Rotation {rotation * 90}°{flipped ? ' · miroir' : ''}
-            </span>
-          </div>
-        </div>
-        <div className="composer-actions">
-          <button
-            type="button"
-            className="btn btn--ghost btn--small"
-            onClick={rotate}
-            disabled={disabled}
-          >
-            {fr.common.rotate}
-          </button>
-          {canFlip(activeKind) ? (
-            <button
-              type="button"
-              className="btn btn--ghost btn--small"
-              onClick={flip}
-              disabled={disabled}
-              aria-pressed={flipped}
-            >
-              {fr.common.flip}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="btn btn--ghost btn--small"
-            onClick={remove}
-            disabled={disabled || !placed}
-          >
-            {fr.common.remove}
-          </button>
-          <button
-            type="button"
-            className="btn btn--ghost btn--small"
-            onClick={clear}
-            disabled={
-              disabled ||
-              (mine.pieces.length === 0 &&
-                crosses.length === 0 &&
-                edgeMarks.length === 0 &&
-                colorMarks.length === 0)
-            }
-          >
-            {fr.placement.clear}
-          </button>
-        </div>
-      </div>
-
       {onScanCell || onCrossesChange || onEdgeMarksChange || onColorMarksChange ? (
         <div className="composer-tools">
           <div className="mode-switch" role="group" aria-label={fr.placement.notesTool}>
@@ -666,6 +578,93 @@ export function MineComposer({
             </button>
           ) : null}
         </div>
+      ) : null}
+      {tool === 'piece' ? (
+        <>
+          <div className="palette" role="group" aria-label={fr.placement.palette}>
+            {orderedPalette.map((kind) => {
+              const isPlaced = mine.pieces.some((piece) => piece.kind === kind);
+              return (
+                <button
+                  key={kind}
+                  type="button"
+                  className={`palette-item${activeKind === kind ? ' is-active' : ''}${isPlaced ? ' is-placed' : ''}`}
+                  onClick={() => selectKind(kind)}
+                  disabled={disabled}
+                  aria-pressed={activeKind === kind}
+                  aria-label={`${labelForKind(kind)}${isPlaced ? ' (placée)' : ''}`}
+                  title={labelForKind(kind)}
+                >
+                  <GemPreview
+                    kind={kind}
+                    rotation={activeKind === kind ? rotation : 0}
+                    flipped={activeKind === kind ? flipped : false}
+                  />
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="composer-toolbar">
+            <div className="composer-selected">
+              <GemPreview
+                kind={activeKind}
+                rotation={rotation}
+                flipped={flipped}
+                className="gem-preview--small"
+              />
+              <div>
+                <strong>{labelForKind(activeKind)}</strong>
+                <span>
+                  Rotation {rotation * 90}°{flipped ? ' · miroir' : ''}
+                </span>
+              </div>
+            </div>
+            <div className="composer-actions">
+              <button
+                type="button"
+                className="btn btn--ghost btn--small"
+                onClick={rotate}
+                disabled={disabled}
+              >
+                {fr.common.rotate}
+              </button>
+              {canFlip(activeKind) ? (
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--small"
+                  onClick={flip}
+                  disabled={disabled}
+                  aria-pressed={flipped}
+                >
+                  {fr.common.flip}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="btn btn--ghost btn--small"
+                onClick={remove}
+                disabled={disabled || !placed}
+              >
+                {fr.common.remove}
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost btn--small"
+                onClick={clear}
+                disabled={
+                  disabled ||
+                  (mine.pieces.length === 0 &&
+                    crosses.length === 0 &&
+                    edgeMarks.length === 0 &&
+                    colorMarks.length === 0)
+                }
+              >
+                {fr.placement.clear}
+              </button>
+            </div>
+          </div>
+        </>
       ) : null}
 
       {edgeMode || dotMode ? (

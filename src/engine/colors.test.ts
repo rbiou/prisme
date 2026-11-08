@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   GEM_COLORS,
+  NOTE_COLOR_LABELS,
   RAY_COLOR_LABELS,
   gemColorsForRayColor,
   isGemColor,
@@ -89,5 +90,10 @@ describe('mélange des couleurs', () => {
     expect(rayMixLabel('red')).toBeNull();
     expect(rayMixLabel('white')).toBeNull();
     expect(rayMixLabel('transparent')).toBeNull();
+  });
+
+  it('nomme la gemme spéciale « Noir » dans les notes de couleur', () => {
+    expect(NOTE_COLOR_LABELS['black-body']).toBe('Noir');
+    expect(NOTE_COLOR_LABELS['clear-diamond']).toBe('Diamant');
   });
 });

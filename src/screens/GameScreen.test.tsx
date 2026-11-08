@@ -294,6 +294,16 @@ describe('GameScreen', () => {
     expect(screen.queryByLabelText('Table des seize mélanges')).toBeNull();
   });
 
+  it('n’affiche la palette de gemmes que dans l’onglet Gemmes', () => {
+    renderGame();
+
+    expect(screen.queryByRole('group', { name: 'Gemmes' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Gemmes' }));
+
+    expect(screen.getByRole('group', { name: 'Gemmes' })).toBeInTheDocument();
+  });
+
   it('demande une confirmation privée avant de répondre à un scan adverse', () => {
     const game: GameState = {
       ...createGame('host'),
